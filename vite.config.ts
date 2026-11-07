@@ -1,11 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { viteSingleFile } from 'vite-plugin-singlefile';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // `vite build --mode artifact` : une seule page HTML autonome (polices comprises), sans mode hors ligne.
+  ...(mode === 'artifact' ? { build: { outDir: 'dist-artifact', assetsInlineLimit: 100_000_000 } } : {}),
   plugins: [
     react(),
-    VitePWA({
+    mode === 'artifact' ? viteSingleFile() : VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
@@ -30,4 +33,4 @@ export default defineConfig({
     }),
   ],
   server: { host: true },
-});
+}));
