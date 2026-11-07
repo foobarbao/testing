@@ -51,6 +51,9 @@ Le mode hors ligne et l'installation (PWA) ne sont actifs que sur la version con
 - **Grenouille** : même question sur une règle de 10 graduations ; chaque appui fait un bond numéroté et « +3 » suit la grenouille.
 - **Amoureux de 10** : toucher deux bulles qui font 10 (3 plateaux de 4 paires).
 - Niveau « 47 + ? = 50 » : compléments à la dizaine suivante (et paires qui font 100).
+- **Concours** des amoureux : 20 paires (40 bulles) par écran, chronométré. « 60 secondes » : un maximum de paires, un nouvel écran arrive quand le précédent est vidé. « Course » : trouver 10, 20 ou 40 paires le plus vite possible. Compte à rebours 3-2-1 avec la photo du joueur, médailles (bronze, argent, or, diamant), couronne pour un record ou la première place, nouveaux trophées, podium avec les photos.
+
+**Joueurs** : « Qui joue ? » depuis l'accueil (la photo du joueur s'affiche en haut). Chaque profil a un prénom, une couleur et une photo prise en direct : la caméra s'affiche, compte à rebours 3-2-1, flash. Si la caméra en direct n'est pas disponible (par exemple dans la page claude.ai), le bouton ouvre l'appareil photo du téléphone. La page de profil montre les records, les trophées et les derniers concours. Profils, photos (192 × 192, environ 5 Ko) et scores restent dans le navigateur de l'appareil (`localStorage`, clé `retenue:profiles`) : rien n'est envoyé.
 
 Les compléments à 10 sont aussi mis en avant dans les leçons : au moment du paquet de 10, la voix et l'addition posée disent « 7 + 3 = 10, reste 5 » et les 3 bâtonnets qui complètent la dizaine sont orange. Sur la règle, chaque bond est numéroté, ceux qui mènent à la dizaine sont orange, un « +k » suit la grenouille et « 47 + 3 = 50 » s'affiche en passant la dizaine. Le compteur et « Je manipule » affichent aussi « +k ».
 
@@ -80,9 +83,9 @@ src/
   engine/      calculs par niveau, découpage d'une addition en étapes, réponses au choix, compléments à 10
   visuals/     un composant par visuel ; tous reçoivent (lesson, step, dur)
   play/        ce que l'enfant manipule : plateau à regrouper, règle et compteur pilotés, « Je pose », « Je choisis »
-  screens/     accueil, niveaux, choix du visuel, exercice, Mon calcul, Construis le nombre, Fais 10 !
+  screens/     accueil, niveaux, choix du visuel, exercice, Mon calcul, Construis le nombre, Fais 10 !, concours, joueurs, profil
   ten/         boîte de 10 et règle de la grenouille du jeu « Fais 10 ! »
-  lib/         réglages et étoiles (localStorage), sons synthétisés, voix, glisser-déposer
+  lib/         réglages et étoiles, profils et scores des concours (localStorage), sons, voix, glisser-déposer
 ```
 
 Le moteur (`src/engine/steps.ts`) transforme un calcul en une liste d'étapes : poser, additionner une colonne, regrouper 10, faire monter la retenue, écrire le chiffre. Chaque étape décrit l'état de toutes les colonnes. Un visuel n'a qu'à dessiner cet état ; on peut donc changer de visuel au milieu d'une explication sans perdre l'étape. Pendant « Montre-moi », chaque visuel reçoit le geste attendu (`gesture`) et appelle `onDone` quand l'enfant l'a fait.

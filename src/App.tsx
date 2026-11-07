@@ -7,6 +7,11 @@ import Home from './screens/Home';
 import Levels from './screens/Levels';
 import Picker from './screens/Picker';
 import Ten from './screens/Ten';
+import Contest from './screens/Contest';
+import Players from './screens/Players';
+import ProfilePage from './screens/Profile';
+import { ProfilesContext, useProfilesStore } from './lib/profiles';
+import type { TenLevel } from './engine/tens';
 import { SoundContext, playSound, type SoundName } from './lib/sound';
 import { SayContext, speak, unlockSpeechOnFirstTouch } from './lib/speech';
 import { usePrefs } from './lib/storage';
@@ -18,7 +23,10 @@ type Screen =
   | { name: 'exercise'; level: number; fixed?: Ex }
   | { name: 'calc' }
   | { name: 'build' }
-  | { name: 'ten' };
+  | { name: 'ten' }
+  | { name: 'contest'; level: TenLevel }
+  | { name: 'players'; back: Screen }
+  | { name: 'profile'; id: string; back: Screen };
 
 function initialScreen(): Screen {
   try {
@@ -32,6 +40,7 @@ function initialScreen(): Screen {
 
 export default function App() {
   const [prefs, update] = usePrefs();
+  const profiles = useProfilesStore();
   const [screen, setScreen] = useState<Screen>(initialScreen);
 
   useEffect(() => {
@@ -53,6 +62,7 @@ export default function App() {
   return (
     <SoundContext.Provider value={play}>
       <SayContext.Provider value={say}>
+      <ProfilesContext.Provider value={profiles}>
         {screen.name === 'home' && (
           <Home
             prefs={prefs}
@@ -60,6 +70,7 @@ export default function App() {
             onMyCalc={() => setScreen({ name: 'calc' })}
             onBuild={() => setScreen({ name: 'build' })}
             onTen={() => setScreen({ name: 'ten' })}
+            onPlayers={() => setScreen({ name: 'players', back: { name: 'home' } })}
           />
         )}
         {screen.name === 'levels' && (
@@ -81,7 +92,25 @@ export default function App() {
           />
         )}
         {screen.name === 'build' && <Build prefs={prefs} update={update} onBack={home} />}
-        {screen.name === 'ten' && <Ten prefs={prefs} update={update} onBack={home} />}
+        {screen.name === 'ten' && (
+          <Ten prefs={prefs} update={update} onBack={home} onContest={(level) => setScreen({ name: 'contest', level })} />
+        )}
+        {screen.name === 'contest' && (
+          <Contest
+            level={screen.level}
+            onBack={() => setScreen({ name: 'ten' })}
+            onPlayers={() => setScreen({ name: 'players', back: screen })}
+            onProfile={(id) => setScreen({ name: 'profile', id, back: screen })}
+          />
+        )}
+        {screen.name === 'players' && (
+          <Players
+            onBack={() => setScreen(screen.back)}
+            onDone={() => setScreen(screen.back)}
+            onEdit={(id) => setScreen({ name: 'profile', id, back: screen })}
+          />
+        )}
+        {screen.name === 'profile' && <ProfilePage id={screen.id} onBack={() => setScreen(screen.back)} />}
         {screen.name === 'exercise' && (
           <Exercise
             key={screen.fixed ? `${screen.fixed.a}+${screen.fixed.b}` : screen.level}
@@ -93,6 +122,7 @@ export default function App() {
             onAnotherCalc={() => setScreen({ name: 'calc' })}
           />
         )}
+      </ProfilesContext.Provider>
       </SayContext.Provider>
     </SoundContext.Provider>
   );

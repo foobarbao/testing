@@ -23,6 +23,7 @@ interface Props {
   prefs: Prefs;
   update: (p: Partial<Prefs> | ((p: Prefs) => Partial<Prefs>)) => void;
   onBack: () => void;
+  onContest: (level: TenLevel) => void;
 }
 
 function GameIcon({ id }: { id: Game }) {
@@ -58,7 +59,7 @@ function GameIcon({ id }: { id: Game }) {
 }
 
 /** Le jeu des compléments à 10. */
-export default function Ten({ prefs, update, onBack }: Props) {
+export default function Ten({ prefs, update, onBack, onContest }: Props) {
   const [game, setGame] = useState<Game | null>(null);
   const [level, setLevel] = useState<TenLevel>('ten');
   const [run, setRun] = useState(0);
@@ -94,6 +95,16 @@ export default function Ten({ prefs, update, onBack }: Props) {
               </span>
             </button>
           ))}
+          <button className="game-card g-contest" onClick={() => onContest(level)}>
+            <svg viewBox="0 0 64 40" className="game-icon" aria-hidden="true">
+              <path d="M20 4h24v12c0 9-5 15-12 15S20 25 20 16z" fill="#F5C33B" stroke="#B98A10" strokeWidth="2" />
+              <path d="M20 8h-7c0 7 3 11 8 11M44 8h7c0 7-3 11-8 11" fill="none" stroke="#B98A10" strokeWidth="2.5" />
+              <rect x="28" y="31" width="8" height="4" fill="#B98A10" />
+              <rect x="22" y="35" width="20" height="4" rx="1.5" fill="#B98A10" />
+            </svg>
+            <b>Concours</b>
+            <span className="contest-hint">60 s · Course</span>
+          </button>
         </div>
       </main>
     );

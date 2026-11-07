@@ -1,4 +1,6 @@
+import Avatar from '../components/Avatar';
 import { Frog, Star } from '../components/Icons';
+import { currentProfile, useProfiles } from '../lib/profiles';
 import { LEVELS, STARS_PER_LEVEL } from '../engine/levels';
 import type { Prefs } from '../lib/storage';
 
@@ -8,9 +10,12 @@ interface Props {
   onMyCalc: () => void;
   onBuild: () => void;
   onTen: () => void;
+  onPlayers: () => void;
 }
 
-export default function Home({ prefs, onAddition, onMyCalc, onBuild, onTen }: Props) {
+export default function Home({ prefs, onAddition, onMyCalc, onBuild, onTen, onPlayers }: Props) {
+  const { state } = useProfiles();
+  const me = currentProfile(state);
   const total = LEVELS.reduce((acc, l) => acc + Math.min(STARS_PER_LEVEL, prefs.stars[l.id] ?? 0), 0);
   const max = LEVELS.length * STARS_PER_LEVEL;
   return (
@@ -18,6 +23,10 @@ export default function Home({ prefs, onAddition, onMyCalc, onBuild, onTen }: Pr
       <header className="home-head">
         <Frog className="home-frog" />
         <h1>La retenue</h1>
+        <button className="me-chip" onClick={onPlayers} aria-label={me ? `Joueur : ${me.name}. Changer` : 'Qui joue ?'}>
+          <Avatar profile={me} size={48} ring={me?.color} />
+          <span>{me ? me.name : 'Qui joue ?'}</span>
+        </button>
       </header>
 
       <div className="op-grid">

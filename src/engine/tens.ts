@@ -74,3 +74,21 @@ export function starsFor(score: number, total: number) {
   const r = score / total;
   return r >= 0.9 ? 3 : r >= 0.6 ? 2 : 1;
 }
+
+/**
+ * Écran du concours : `pairs` paires mélangées (20 par défaut, soit 40 bulles).
+ * Les valeurs vont toujours par paires, donc l'écran se vide entièrement quelle que soit la façon de jouer.
+ */
+export function contestBoard(level: TenLevel, pairs = 20, screen = 0, rand: Rand = Math.random): Card[] {
+  const scale = level === 'decade' ? 10 : 1;
+  const cards: Card[] = [];
+  for (let k = 0; k < pairs; k++) {
+    const a = between(rand, 1, 9);
+    cards.push({ id: `${screen}-${k}a`, value: a * scale }, { id: `${screen}-${k}b`, value: (10 - a) * scale });
+  }
+  for (let i = cards.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [cards[i], cards[j]] = [cards[j], cards[i]];
+  }
+  return cards;
+}
