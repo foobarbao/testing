@@ -64,6 +64,11 @@ export interface Step {
   value: number;
   /** Pas utilisé pour atteindre cette valeur : 1, 10 ou 100. */
   unit: number;
+  /**
+   * Étape « group » : le complément à 10. Avec 7 + 8, on a déjà 7 ;
+   * il en faut 3 (base 7, comp 3) pour faire 10, et il en reste 5.
+   */
+  comp?: { base: number; comp: number; rest: number };
 }
 
 export interface Lesson {

@@ -7,9 +7,10 @@ interface Props {
   onAddition: () => void;
   onMyCalc: () => void;
   onBuild: () => void;
+  onTen: () => void;
 }
 
-export default function Home({ prefs, onAddition, onMyCalc, onBuild }: Props) {
+export default function Home({ prefs, onAddition, onMyCalc, onBuild, onTen }: Props) {
   const total = LEVELS.reduce((acc, l) => acc + Math.min(STARS_PER_LEVEL, prefs.stars[l.id] ?? 0), 0);
   const max = LEVELS.length * STARS_PER_LEVEL;
   return (
@@ -46,6 +47,18 @@ export default function Home({ prefs, onAddition, onMyCalc, onBuild }: Props) {
           </span>
           <span className="op-name">Mon calcul</span>
           <span className="op-hint">Le calcul des devoirs</span>
+        </button>
+
+        <button className="op-card ten" onClick={onTen}>
+          <span className="op-sign" aria-hidden="true">
+            <svg viewBox="0 0 64 30" width="50" height="24">
+              {Array.from({ length: 10 }, (_, i) => (
+                <circle key={i} cx={8 + (i % 5) * 12} cy={i < 5 ? 8 : 22} r={4.8} fill={i < 7 ? 'currentColor' : 'var(--star)'} />
+              ))}
+            </svg>
+          </span>
+          <span className="op-name">Fais 10 !</span>
+          <span className="op-hint">Le jeu des compléments</span>
         </button>
 
         <button className="op-card small build" onClick={onBuild}>

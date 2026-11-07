@@ -12,6 +12,10 @@ describe('buildLesson', () => {
     expect(last.cols.map((c) => c.result)).toEqual([5, 7]);
     expect(l.steps[4].cols[1]).toMatchObject({ carryIn: true, total: 7 });
     expect(l.steps[4].say).toBe('Maintenant, les dizaines : 1 de retenue + 4 + 2 = 7.');
+    // Complément à 10 : 7 et 3 font 10, il reste 5.
+    expect(l.steps[2].comp).toEqual({ base: 7, comp: 3, rest: 5 });
+    expect(l.steps[2].say).toBe('7 et 3 font 10 : ça fait 1 dizaine ! Il reste 5 unités.');
+    expect(l.steps[2].note.map((x) => x.t).join('')).toBe('7 + 3 = 10, reste 5');
   });
 
   it('7 + 5 : la colonne des dizaines ne contient que la retenue', () => {
@@ -25,6 +29,8 @@ describe('buildLesson', () => {
   it('286 + 147 : deux retenues', () => {
     expect(kinds(286, 147)).toEqual(['pose', 'add0', 'group0', 'carry0', 'add1', 'group1', 'carry1', 'add2', 'write2', 'done']);
     const l = buildLesson({ op: 'add', a: 286, b: 147, level: 4 });
+    // Dizaines : 1 de retenue + 8 = 9, il faut 1 dizaine de plus pour faire 10.
+    expect(l.steps[5].comp).toEqual({ base: 9, comp: 1, rest: 3 });
     expect(l.steps[6].say).toBe("10 dizaines deviennent 1 centaine ! J'écris 3 et je retiens 1.");
   });
 

@@ -100,11 +100,20 @@ function instruction(visual: VisualId, next: Step): Prompt {
   const cs = next.cols[c];
   if (visual === 'ruler' || visual === 'counter') {
     const b = cs?.b ?? 0;
+    // Complément : combien de pas pour arriver à la dizaine (ou centaine) suivante ?
+    const unit = 10 ** c;
+    const from = next.value - b * unit;
+    const big = unit * 10;
+    const ten = Math.ceil((from + 1) / big) * big;
+    const k = (ten - from) / unit;
+    const passes = from % big !== 0 && k <= b;
     if (visual === 'ruler') {
       const kind = (b > 1 ? ['petits bonds', 'grands bonds', 'très grands bonds'] : ['petit bond', 'grand bond', 'très grand bond'])[c];
-      return { text: `${b} ${kind}`, voice: `Tape ${b} fois sur la règle pour faire ${b} ${kind}.` };
+      const tip = passes ? ` Regarde : avec ${k} bond${k > 1 ? 's' : ''}, tu arrives à ${ten}.` : '';
+      return { text: `${b} ${kind}`, voice: `Tape ${b} fois sur la règle pour faire ${b} ${kind}.${tip}` };
     }
-    return { text: `Tape ${b} fois`, voice: `Tape ${b} fois sur le chiffre des ${PLURAL[c]}.` };
+    const tip = passes ? ` Au bout de ${k} fois, tu passes à ${ten} !` : '';
+    return { text: `Tape ${b} fois`, voice: `Tape ${b} fois sur le chiffre des ${PLURAL[c]}.${tip}` };
   }
   const t = THING[visual];
   switch (next.kind) {

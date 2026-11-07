@@ -21,6 +21,8 @@ export interface Prefs {
   stars: Record<number, number>;
   /** Étoiles de « Construis le nombre », par difficulté. */
   buildStars: Record<string, number>;
+  /** Meilleur nombre d'étoiles (1 à 3) aux jeux « Fais 10 ! », par jeu et niveau. */
+  tenBest: Record<string, number>;
 }
 
 const KEY = 'retenue:v1';
@@ -36,6 +38,7 @@ export const DEFAULT_PREFS: Prefs = {
   buildModel: 'sticks',
   stars: {},
   buildStars: {},
+  tenBest: {},
 };
 
 function load(): Prefs {

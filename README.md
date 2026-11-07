@@ -46,6 +46,14 @@ Le mode hors ligne et l'installation (PWA) ne sont actifs que sur la version con
 
 **Mon calcul** : on recopie une addition des devoirs (résultat jusqu'à 999) et on la travaille avec tous les visuels et toutes les façons de répondre.
 
+**Fais 10 !** : le jeu des compléments à 10, en 10 manches avec points, série et étoiles (record gardé).
+- **Boîte de 10** : « 7 + ? = 10 ». L'enfant choisit une bulle, ou remplit la boîte pour compter ; les jetons ajoutés sont orange, numérotés, et le total « +3 » s'affiche.
+- **Grenouille** : même question sur une règle de 10 graduations ; chaque appui fait un bond numéroté et « +3 » suit la grenouille.
+- **Amoureux de 10** : toucher deux bulles qui font 10 (3 plateaux de 4 paires).
+- Niveau « 47 + ? = 50 » : compléments à la dizaine suivante (et paires qui font 100).
+
+Les compléments à 10 sont aussi mis en avant dans les leçons : au moment du paquet de 10, la voix et l'addition posée disent « 7 + 3 = 10, reste 5 » et les 3 bâtonnets qui complètent la dizaine sont orange. Sur la règle, chaque bond est numéroté, ceux qui mènent à la dizaine sont orange, un « +k » suit la grenouille et « 47 + 3 = 50 » s'affiche en passant la dizaine. Le compteur et « Je manipule » affichent aussi « +k ».
+
 **Construis le nombre** : un nombre s'affiche et l'enfant le représente avec un modèle (bâtonnets, monnaie, boulier, règle, compteur). Jusqu'à 20, il part d'un tas d'unités à ranger en dizaines. Il peut aussi taper son propre nombre. Pour regrouper, il fait glisser un élément vers la colonne de gauche ou appuie sur « Faire un fagot » ; pour casser une dizaine, il la fait glisser vers la droite.
 
 **Voix** : activée par défaut. Elle lit le calcul, chaque étape du mode guidé, les consignes et les indices. Sur iPhone et iPad, elle démarre après le premier appui sur l'écran.
@@ -69,10 +77,11 @@ Code couleur partout : unités en vert, dizaines en bleu, centaines en violet, r
 
 ```
 src/
-  engine/      calculs par niveau, découpage d'une addition en étapes, réponses au choix
+  engine/      calculs par niveau, découpage d'une addition en étapes, réponses au choix, compléments à 10
   visuals/     un composant par visuel ; tous reçoivent (lesson, step, dur)
   play/        ce que l'enfant manipule : plateau à regrouper, règle et compteur pilotés, « Je pose », « Je choisis »
-  screens/     accueil, niveaux, choix des visuels, exercice
+  screens/     accueil, niveaux, choix du visuel, exercice, Mon calcul, Construis le nombre, Fais 10 !
+  ten/         boîte de 10 et règle de la grenouille du jeu « Fais 10 ! »
   lib/         réglages et étoiles (localStorage), sons synthétisés, voix, glisser-déposer
 ```
 

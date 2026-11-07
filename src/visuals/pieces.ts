@@ -114,8 +114,11 @@ export function layoutPieces(lesson: Lesson, stepIdx: number, width: number, cfg
       case 'grouping': {
         const sq = cfg.squeeze[c];
         const gx = groupX(c, c);
+        // Complément à 10 : les éléments du second nombre qui complètent la dizaine.
+        const comp = s.kind === 'group' && s.col === c && s.comp ? s.comp.comp : 0;
+        const isComp = (k: string) => k.startsWith(`${c}b`) && Number(k.slice(`${c}b`.length)) < comp;
         merged.slice(0, 10).forEach((k, j) =>
-          put(k, { x: gx + j * sq.pitch, y: lineY(0, d.h) }, `${clsOf(k)} grouped`, sq.w),
+          put(k, { x: gx + j * sq.pitch, y: lineY(0, d.h) }, `${clsOf(k)} grouped${isComp(k) ? ' comp' : ''}`, sq.w),
         );
         merged.slice(10).forEach((k, i) => put(k, slot(i, 1), clsOf(k)));
         extras.push(

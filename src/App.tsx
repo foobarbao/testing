@@ -6,6 +6,7 @@ import Exercise from './screens/Exercise';
 import Home from './screens/Home';
 import Levels from './screens/Levels';
 import Picker from './screens/Picker';
+import Ten from './screens/Ten';
 import { SoundContext, playSound, type SoundName } from './lib/sound';
 import { SayContext, speak, unlockSpeechOnFirstTouch } from './lib/speech';
 import { usePrefs } from './lib/storage';
@@ -16,7 +17,8 @@ type Screen =
   | { name: 'picker'; level: number }
   | { name: 'exercise'; level: number; fixed?: Ex }
   | { name: 'calc' }
-  | { name: 'build' };
+  | { name: 'build' }
+  | { name: 'ten' };
 
 function initialScreen(): Screen {
   try {
@@ -57,6 +59,7 @@ export default function App() {
             onAddition={() => setScreen({ name: 'levels' })}
             onMyCalc={() => setScreen({ name: 'calc' })}
             onBuild={() => setScreen({ name: 'build' })}
+            onTen={() => setScreen({ name: 'ten' })}
           />
         )}
         {screen.name === 'levels' && (
@@ -78,6 +81,7 @@ export default function App() {
           />
         )}
         {screen.name === 'build' && <Build prefs={prefs} update={update} onBack={home} />}
+        {screen.name === 'ten' && <Ten prefs={prefs} update={update} onBack={home} />}
         {screen.name === 'exercise' && (
           <Exercise
             key={screen.fixed ? `${screen.fixed.a}+${screen.fixed.b}` : screen.level}

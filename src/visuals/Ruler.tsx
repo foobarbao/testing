@@ -18,6 +18,25 @@ export interface Hop {
   from: number;
   to: number;
   rank: number;
+  /** Bond qui complète la dizaine (complément à 10), dessiné en orange. */
+  comp?: boolean;
+  /** Numéro du bond dans sa série (1, 2, 3…). */
+  n?: number;
+}
+
+/** Bonds d'une série depuis `from` : numérotés, ceux qui mènent à la dizaine suivante marqués. */
+export function hopRun(from: number, count: number, rank: number): Hop[] {
+  const size = 10 ** rank;
+  const big = size * 10;
+  const ten = Math.ceil((from + 1) / big) * big;
+  const reaches = from + count * size >= ten && from % big !== 0;
+  return Array.from({ length: count }, (_, k) => ({
+    from: from + k * size,
+    to: from + (k + 1) * size,
+    rank,
+    n: k + 1,
+    comp: reaches && from + (k + 1) * size <= ten,
+  }));
 }
 
 interface SceneProps {
@@ -30,11 +49,13 @@ interface SceneProps {
   start: number;
   zoomUnit: number;
   dur: number;
-  flash: { id: number; rank: number } | null;
+  flash: { id: number; rank: number; text?: string } | null;
+  /** Total ajouté depuis le départ de la série, affiché « +3 » à côté de la grenouille. */
+  plus?: number;
 }
 
 /** La règle, la grenouille et ses bonds. */
-export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, flash }: SceneProps) {
+export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, flash, plus }: SceneProps) {
   const z = ZOOM[zoomUnit] ?? ZOOM[1];
   const half = width / 2 / z.px + z.minor * 2;
   const lo = Math.max(0, Math.floor((Math.min(v, target) - half) / z.minor) * z.minor);
@@ -76,11 +97,14 @@ export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, f
               const x2 = h.to * z.px;
               const lift = Math.min(46, Math.abs(x2 - x1) * 0.6);
               return (
-                <path
-                  key={`${i}-${h.from}-${h.rank}`}
-                  d={`M${x1},${BASE - 4} Q${(x1 + x2) / 2},${BASE - 4 - lift * 1.6} ${x2},${BASE - 4}`}
-                  className={`hop ${RANK_CLASS[h.rank]}`}
-                />
+                <g key={`${i}-${h.from}-${h.rank}`} className={`hop ${RANK_CLASS[h.rank]} ${h.comp ? 'comp' : ''}`}>
+                  <path d={`M${x1},${BASE - 4} Q${(x1 + x2) / 2},${BASE - 4 - lift * 1.6} ${x2},${BASE - 4}`} />
+                  {h.n !== undefined && x2 - x1 >= 14 && (
+                    <text x={(x1 + x2) / 2} y={BASE - 4 - lift * 0.8 - 4} textAnchor="middle" className="hop-n">
+                      {h.n}
+                    </text>
+                  )}
+                </g>
               );
             })}
         </g>
@@ -98,9 +122,14 @@ export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, f
         </svg>
         <span className="frog-value">{v}</span>
       </div>
+      {plus !== undefined && plus > 0 && (
+        <span className="plus-chip on ruler-plus" style={{ left: width / 2 + 26 }}>
+          +{plus}
+        </span>
+      )}
       {flash && (
-        <span key={flash.id} className={`ruler-flash ${RANK_CLASS[flash.rank]}`} style={{ left: width / 2 }}>
-          +1 {flash.rank === 1 ? 'dizaine' : 'centaine'} !
+        <span key={flash.id} className={`ruler-flash ${RANK_CLASS[flash.rank]} ${flash.text ? 'comp' : ''}`} style={{ left: width / 2 }}>
+          {flash.text ?? `+1 ${flash.rank === 1 ? 'dizaine' : 'centaine'} !`}
         </span>
       )}
     </>
@@ -112,7 +141,7 @@ export default function Ruler({ lesson, step, dur, gesture }: VisualProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const play = useSound();
   const s = lesson.steps[step];
-  const [flash, setFlash] = useState<{ id: number; rank: number } | null>(null);
+  const [flash, setFlash] = useState<{ id: number; rank: number; text?: string } | null>(null);
   const { taps, need, tap } = useTaps(step, gesture, dur * 0.9);
   const unit = gesture?.next.kind === 'add' ? gesture.next.unit : 0;
   const v = s.value + taps * unit;
@@ -124,10 +153,8 @@ export default function Ruler({ lesson, step, dur, gesture }: VisualProps) {
     const list: Hop[] = [];
     let p = lesson.ex.a;
     digitsOf(lesson.ex.b).forEach((d, rank) => {
-      for (let k = 0; k < d; k++) {
-        list.push({ from: p, to: p + 10 ** rank, rank });
-        p += 10 ** rank;
-      }
+      list.push(...hopRun(p, d, rank));
+      p += d * 10 ** rank;
     });
     return list;
   }, [lesson]);
@@ -138,7 +165,8 @@ export default function Ruler({ lesson, step, dur, gesture }: VisualProps) {
     if (!tap()) return;
     const next = v + unit;
     if (Math.floor(next / (unit * 10)) > Math.floor(v / (unit * 10))) {
-      setFlash({ id: Date.now(), rank: Math.round(Math.log10(unit)) + 1 });
+      // On arrive sur la dizaine : on montre le complément, « 47 + 3 = 50 ».
+      setFlash({ id: Date.now(), rank: Math.round(Math.log10(unit)) + 1, text: `${s.value} + ${next - s.value} = ${next}` });
       play('click');
     } else play('pop');
   };
@@ -156,12 +184,8 @@ export default function Ruler({ lesson, step, dur, gesture }: VisualProps) {
             zoomUnit={zoomUnit}
             dur={dur}
             flash={flash}
+            plus={taps * unit}
           />
-        )}
-        {gesture && need > 0 && (
-          <span className={`hop-size t-${RANK_CLASS[rank]}`} style={{ left: width / 2 + 26 }}>
-            +{unit}
-          </span>
         )}
         {gesture?.hint && need > 0 && <Hand x={width / 2 - 10} y={58} />}
       </div>

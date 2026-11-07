@@ -178,7 +178,7 @@ export default function BuildPanel(props: Props) {
       setFlash({ id: Date.now(), rank: rank + 1 });
       play('click');
     } else play('pop');
-    setHops((h) => [...h, { from: frog, to: next, rank }]);
+    setHops((h) => [...h, { from: frog, to: next, rank, n: h.filter((x) => x.rank === rank).length + 1 }]);
     touched();
   };
   const undoHop = () => {
@@ -267,7 +267,16 @@ export default function BuildPanel(props: Props) {
           <>
             <div ref={sceneRef} className="vis ruler">
               {width > 0 && (
-                <RulerScene width={width} v={frog} hops={hops} start={startValue} zoomUnit={10 ** lastRank} dur={dur} flash={flash} />
+                <RulerScene
+                  width={width}
+                  v={frog}
+                  hops={hops}
+                  start={startValue}
+                  zoomUnit={10 ** lastRank}
+                  dur={dur}
+                  flash={flash}
+                  plus={frog - startValue}
+                />
               )}
             </div>
             <div className="hop-tools">
@@ -287,6 +296,7 @@ export default function BuildPanel(props: Props) {
             v={cv}
             target={-1}
             clic={flash}
+            plus={startValue > 0 ? cv - startValue : undefined}
             onTap={locked ? undefined : (r) => turn(r, 1)}
             onMinus={locked ? undefined : (r) => turn(r, -1)}
           />

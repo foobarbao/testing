@@ -16,12 +16,15 @@ interface SceneProps {
   clic: { id: number; rank: number } | null;
   onTap?: (rank: number) => void;
   onMinus?: (rank: number) => void;
+  /** Ce qui a été ajouté, affiché « +8 ». */
+  plus?: number;
 }
 
 /** Compteur à gros chiffres : chaque appui fait tourner un chiffre d'un cran. */
-export function CounterScene({ n, v, target, dots, hint, active = -1, clic, onTap, onMinus }: SceneProps) {
+export function CounterScene({ n, v, target, dots, hint, active = -1, clic, onTap, onMinus, plus }: SceneProps) {
   return (
     <div className="counter" aria-label={`Le compteur affiche ${v}`}>
+      {plus !== undefined && plus > 0 && <span className="plus-chip on counter-plus">+{plus}</span>}
       {Array.from({ length: n }, (_, i) => {
         const c = n - 1 - i;
         const digit = Math.floor(v / 10 ** c) % 10;
@@ -94,6 +97,7 @@ export default function Counter({ lesson, step, dur, gesture }: VisualProps) {
         active={gesture ? -1 : activeCol(s)}
         clic={clic}
         onTap={gesture ? onTap : undefined}
+        plus={taps * unit}
       />
     </div>
   );

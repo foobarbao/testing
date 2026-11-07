@@ -88,18 +88,35 @@ function buildAddition(ex: Exercise): Lesson {
 
     if (total >= 10) {
       cols[c] = { ...cols[c], phase: 'grouping' };
+      // Complément à 10 : ce qu'on avait déjà (retenue + premier nombre) et ce qu'il faut ajouter pour faire 10.
+      const base = (col.carryIn ? 1 : 0) + col.a;
+      const comp = 10 - base;
+      const rest = total - 10;
+      const withComp = comp > 0 && comp <= col.b;
       push({
         kind: 'group',
         col: c,
         unit,
-        say: `Voilà 10 ${PLURAL[c]} ensemble : ça fait 1 ${SINGULAR[c + 1]} !`,
-        note: [
-          { t: String(total), tone },
-          { t: ' = ' },
-          { t: `1 ${SINGULAR[c + 1]}`, tone: 'r' },
-          { t: ' et ' },
-          { t: `${total - 10} ${rankWord(c, total - 10)}`, tone },
-        ],
+        comp: withComp ? { base, comp, rest } : undefined,
+        say: withComp
+          ? `${base} et ${comp} font 10 : ça fait 1 ${SINGULAR[c + 1]} ! Il reste ${rest} ${rankWord(c, rest)}.`
+          : `Voilà 10 ${PLURAL[c]} ensemble : ça fait 1 ${SINGULAR[c + 1]} !`,
+        note: withComp
+          ? [
+              { t: String(base), tone },
+              { t: ' + ' },
+              { t: String(comp), tone: 'r' },
+              { t: ' = 10' },
+              { t: ', reste ' },
+              { t: String(rest), tone },
+            ]
+          : [
+              { t: String(total), tone },
+              { t: ' = ' },
+              { t: `1 ${SINGULAR[c + 1]}`, tone: 'r' },
+              { t: ' et ' },
+              { t: `${rest} ${rankWord(c, rest)}`, tone },
+            ],
       });
       cols[c] = { ...cols[c], phase: 'done', result: total - 10, carriedOut: true };
       cols[c + 1] = { ...cols[c + 1], carryIn: true };
