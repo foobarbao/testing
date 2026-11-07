@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Avatar from '../components/Avatar';
 import Handoff from '../components/Handoff';
+import Duel from './Duel';
 import { Back, Replay } from '../components/Icons';
 import { Crown, MEDAL_COLOR, MedalIcon, Podium, TrophyBadge } from '../components/Rewards';
 import { contestBoard, pairTarget, type Card, type TenLevel } from '../engine/tens';
 import {
   CHRONO_SECONDS,
+  DUEL_ROUNDS,
+  DUEL_SECONDS,
   MEDAL_LABEL,
   RACE_GOALS,
   currentProfile,
@@ -30,7 +33,7 @@ interface Props {
   onProfile: (id: string) => void;
 }
 
-type Phase = 'setup' | 'handoff' | 'countdown' | 'play' | 'end';
+type Phase = 'setup' | 'handoff' | 'countdown' | 'play' | 'end' | 'duel';
 interface Result {
   score: ContestScore;
   record: boolean;
@@ -50,6 +53,9 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
   const [phase, setPhase] = useState<Phase>('setup');
   const [result, setResult] = useState<Result | null>(null);
   const [run, setRun] = useState(0);
+  const [duel, setDuel] = useState(false);
+  const [rivalId, setRivalId] = useState<string | null>(null);
+  const [rounds, setRounds] = useState(2);
   const eventGoal = mode === 'chrono' ? CHRONO_SECONDS : goal;
   const board = leaderboard(state, mode, level, eventGoal);
   // Joueur suivant dans la liste (pour « Au tour de Tom »).
@@ -57,14 +63,25 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
     me && state.profiles.length > 1
       ? state.profiles[(state.profiles.findIndex((p) => p.id === me.id) + 1) % state.profiles.length]
       : null;
+  const others = me ? state.profiles.filter((p) => p.id !== me.id) : [];
+  const rival = others.find((p) => p.id === rivalId) ?? others[0] ?? null;
 
   useEffect(() => {
+    if (phase === 'setup' && duel) {
+      say(rival ? `${me?.name} contre ${rival.name} ! Touche C'est parti !` : 'Pour jouer à deux, ajoute un autre joueur.');
+      return;
+    }
     if (phase === 'setup') say(me ? `${me.name}, touche C'est parti !` : 'Qui joue ? Touche le bouton orange.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, me?.id]);
+  }, [phase, me?.id, duel]);
 
   const start = () => {
     if (!me) return onPlayers();
+    if (duel) {
+      if (!rival) return onPlayers();
+      setRun((r) => r + 1);
+      return setPhase('duel');
+    }
     setResult(null);
     setPhase('countdown');
     setRun((r) => r + 1);
@@ -82,6 +99,9 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
     say(`Bravo ${me.name} ! ${what} !${out.champion ? ' Tu es le champion !' : out.record ? ' Nouveau record !' : ''}`);
   };
 
+  if (phase === 'duel' && me && rival) {
+    return <Duel key={run} players={[me, rival]} rounds={rounds} level={level} onExit={() => setPhase('setup')} />;
+  }
   if (phase === 'handoff' && nextPlayer) {
     return (
       <Handoff
@@ -159,21 +179,82 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
       )}
 
       <div className="answer-tabs" role="tablist" aria-label="Épreuve">
-        <button role="tab" className="answer-tab big-tab icon-tab" aria-selected={mode === 'chrono'} onClick={() => setMode('chrono')}>
+        <button
+          role="tab"
+          className="answer-tab big-tab icon-tab"
+          aria-selected={!duel && mode === 'chrono'}
+          onClick={() => {
+            setDuel(false);
+            setMode('chrono');
+          }}
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="13.5" r="8" />
             <path d="M12 9v5l3 2M9.5 2.5h5" />
           </svg>
-          60 secondes
+          60 s
         </button>
-        <button role="tab" className="answer-tab big-tab icon-tab" aria-selected={mode === 'race'} onClick={() => setMode('race')}>
+        <button
+          role="tab"
+          className="answer-tab big-tab icon-tab"
+          aria-selected={!duel && mode === 'race'}
+          onClick={() => {
+            setDuel(false);
+            setMode('race');
+          }}
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 21V3M5 4h12l-2.5 4L17 12H5" />
           </svg>
           Course
         </button>
+        <button role="tab" className="answer-tab big-tab icon-tab" aria-selected={duel} onClick={() => setDuel(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="7" cy="8" r="3.5" />
+            <circle cx="17" cy="8" r="3.5" />
+            <path d="M1.5 20c0-4 2.5-6 5.5-6s5.5 2 5.5 6M11.5 20c0-4 2.5-6 5.5-6s5.5 2 5.5 6" />
+          </svg>
+          À deux
+        </button>
       </div>
-      {mode === 'race' && (
+      {duel && (
+        <section className="duel-setup">
+          {others.length ? (
+            <div className="rival-row" role="radiogroup" aria-label="Contre qui ?">
+              <span className="vs-mini">VS</span>
+              {others.map((p) => (
+                <button
+                  key={p.id}
+                  role="radio"
+                  aria-checked={rival?.id === p.id}
+                  className={`rival ${rival?.id === p.id ? 'on' : ''}`}
+                  onClick={() => setRivalId(p.id)}
+                >
+                  <Avatar profile={p} size={58} ring={rival?.id === p.id ? p.color : undefined} />
+                  <b>{p.name}</b>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button className="btn show big" onClick={onPlayers}>
+              + Un autre joueur
+            </button>
+          )}
+          <div className="goal-row" role="radiogroup" aria-label={`Nombre de manches de ${DUEL_SECONDS} secondes`}>
+            {DUEL_ROUNDS.map((r) => (
+              <button key={r} role="radio" aria-checked={rounds === r} className={`goal ${rounds === r ? 'on' : ''}`} onClick={() => setRounds(r)}>
+                <span className="round-dots" aria-hidden="true">
+                  {Array.from({ length: r }, (_, i) => (
+                    <i key={i} />
+                  ))}
+                </span>
+                <small>{r} × {DUEL_SECONDS} s</small>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {!duel && mode === 'race' && (
         <div className="goal-row" role="radiogroup" aria-label="Nombre de paires">
           {RACE_GOALS.map((g) => (
             <button key={g} role="radio" aria-checked={goal === g} className={`goal ${goal === g ? 'on' : ''}`} onClick={() => setGoal(g)}>
@@ -192,10 +273,12 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
         </button>
       </div>
 
-      <section className="honor">
-        <h2 className="section-title">Tableau d'honneur</h2>
-        {board.length ? <Podium rows={board} highlight={me?.id} /> : <p className="honor-empty">Personne encore : à toi !</p>}
-      </section>
+      {!duel && (
+        <section className="honor">
+          <h2 className="section-title">Tableau d'honneur</h2>
+          {board.length ? <Podium rows={board} highlight={me?.id} /> : <p className="honor-empty">Personne encore : à toi !</p>}
+        </section>
+      )}
 
       <button className="btn primary big" onClick={start}>
         C'est parti !
@@ -235,13 +318,15 @@ function Countdown({ me, onGo }: { me: Profile; onGo: () => void }) {
   );
 }
 
-const SCREEN_PAIRS = 20;
+/** 8 paires par écran : 16 grosses bulles, faciles à lire. */
+const SCREEN_PAIRS = 8;
 
-function ContestGame({
+export function ContestGame({
   me,
   mode,
   goal,
   level,
+  seconds = CHRONO_SECONDS,
   onQuit,
   onEnd,
 }: {
@@ -249,6 +334,8 @@ function ContestGame({
   mode: ContestMode;
   goal: number;
   level: TenLevel;
+  /** Durée du chrono (60 s en concours, 30 s par manche en duel). */
+  seconds?: number;
   onQuit: () => void;
   onEnd: (pairs: number, ms: number, misses: number) => void;
 }) {
@@ -268,7 +355,7 @@ function ContestGame({
   const ended = useRef(false);
   const lastTick = useRef(99);
 
-  const total = CHRONO_SECONDS * 1000;
+  const total = seconds * 1000;
   const left = Math.max(0, total - now);
 
   const end = (p: number, ms: number, m: number) => {
@@ -334,7 +421,7 @@ function ContestGame({
     }
   };
 
-  const shown = mode === 'chrono' ? Math.ceil(left / 1000) : (now / 1000).toFixed(1).replace('.', ',');
+  const shown = mode === 'chrono' ? Math.ceil(left / 1000) : Math.floor(now / 1000);
   const urgent = mode === 'chrono' && left <= 10000;
 
   return (

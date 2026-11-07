@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { contestBoard } from '../engine/tens';
-import { better, leaderboard, medalFor, outcome, trophiesOf, type ContestScore, type ProfilesState } from './profiles';
+import { better, duelTotals, leaderboard, medalFor, outcome, trophiesOf, type ContestScore, type ProfilesState } from './profiles';
 
 const score = (p: Partial<ContestScore>): ContestScore => ({
   id: Math.random().toString(36),
@@ -22,6 +22,7 @@ const state = (scores: ContestScore[]): ProfilesState => ({
   ],
   current: 'lea',
   scores,
+  duels: [],
 });
 
 describe('concours', () => {
@@ -55,6 +56,14 @@ describe('concours', () => {
     expect(o.champion).toBe(true);
     expect(o.newTrophies.map((t) => t.id)).toEqual(['p10', 'perfect']);
     expect(trophiesOf(s.scores, 'lea').has('first')).toBe(true);
+  });
+
+  it('compte un duel et donne le trophée au gagnant', () => {
+    expect(duelTotals([[5, 7], [6, 4]])).toEqual({ totals: [12, 10], winner: 0 });
+    expect(duelTotals([[5], [5]]).winner).toBeNull();
+    const duel = { id: 'd', date: 0, level: 'ten' as const, players: ['lea', 'tom'] as [string, string], rounds: [[5], [3]] as [number[], number[]], winner: 'lea' };
+    expect(trophiesOf([], 'lea', [duel]).has('duel')).toBe(true);
+    expect(trophiesOf([], 'tom', [duel]).has('duel')).toBe(false);
   });
 
   it('crée un écran de 20 paires toutes réalisables', () => {

@@ -27,18 +27,33 @@ export interface ContestScore {
   date: number;
 }
 
+/** Un duel à deux : manches de 30 secondes, chacun son tour. */
+export interface Duel {
+  id: string;
+  date: number;
+  level: TenLevel;
+  players: [string, string];
+  /** Paires trouvées à chaque manche, par joueur. */
+  rounds: [number[], number[]];
+  /** Identifiant du gagnant, ou null en cas d'égalité. */
+  winner: string | null;
+}
+
 export interface ProfilesState {
   profiles: Profile[];
   current: string | null;
   scores: ContestScore[];
+  duels: Duel[];
 }
 
 export const PROFILE_COLORS = ['#2B74D9', '#23995A', '#EE7A12', '#8A4FD8', '#E0444B', '#0FA3A3', '#D9A21B', '#C2378A'];
 export const CHRONO_SECONDS = 60;
 export const RACE_GOALS = [10, 20, 40];
+export const DUEL_SECONDS = 30;
+export const DUEL_ROUNDS = [1, 2, 3];
 
 const KEY = 'retenue:profiles';
-const EMPTY: ProfilesState = { profiles: [], current: null, scores: [] };
+const EMPTY: ProfilesState = { profiles: [], current: null, scores: [], duels: [] };
 
 function load(): ProfilesState {
   try {
@@ -123,12 +138,14 @@ export const TROPHIES: Trophy[] = [
   { id: 'gold', name: "Médaille d'or", hint: "Gagner une médaille d'or" },
   { id: 'hundred', name: 'Amoureux de 100', hint: 'Un concours au niveau 100' },
   { id: 'marathon', name: 'Marathon', hint: 'Jouer 10 concours' },
+  { id: 'duel', name: 'Duel gagné', hint: 'Gagner un duel à deux' },
 ];
 
 /** Trophées gagnés par un joueur, d'après tous ses scores. */
-export function trophiesOf(scores: ContestScore[], profileId: string): Set<string> {
+export function trophiesOf(scores: ContestScore[], profileId: string, duels: Duel[] = []): Set<string> {
   const mine = scores.filter((s) => s.profileId === profileId);
   const got = new Set<string>();
+  if (duels.some((d) => d.winner === profileId)) got.add('duel');
   if (mine.length) got.add('first');
   if (mine.length >= 10) got.add('marathon');
   for (const s of mine) {
@@ -144,6 +161,13 @@ export function trophiesOf(scores: ContestScore[], profileId: string): Set<strin
 }
 
 /** Ce qu'apporte un nouveau score : record personnel, première place, nouveaux trophées. */
+/** Totaux d'un duel et gagnant. */
+export function duelTotals(rounds: [number[], number[]]) {
+  const totals = rounds.map((r) => r.reduce((a, b) => a + b, 0)) as [number, number];
+  const winner = totals[0] === totals[1] ? null : totals[0] > totals[1] ? 0 : 1;
+  return { totals, winner };
+}
+
 export function outcome(state: ProfilesState, s: ContestScore) {
   const before = bestOf(state.scores, s.profileId, s.mode, s.level, s.goal);
   const leader = leaderboard(state, s.mode, s.level, s.goal)[0];
@@ -184,9 +208,15 @@ export function useProfilesStore() {
       commit((s) => ({
         profiles: s.profiles.filter((p) => p.id !== id),
         scores: s.scores.filter((x) => x.profileId !== id),
+        duels: s.duels.filter((d) => !d.players.includes(id)),
         current: s.current === id ? null : s.current,
       })),
     select: (id: string) => commit((s) => ({ ...s, current: id })),
+    addDuel: (duel: Omit<Duel, 'id' | 'date'>) => {
+      const full: Duel = { ...duel, id: uid(), date: Date.now() };
+      commit((s) => ({ ...s, duels: [...s.duels, full] }));
+      return full;
+    },
     addScore: (score: Omit<ContestScore, 'id' | 'date'>) => {
       const full: ContestScore = { ...score, id: uid(), date: Date.now() };
       commit((s) => ({ ...s, scores: [...s.scores, full] }));

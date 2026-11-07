@@ -46,7 +46,8 @@ export default function ProfilePage({ id, onBack }: Props) {
   }
 
   const mine = state.scores.filter((s) => s.profileId === p.id);
-  const trophies = trophiesOf(state.scores, p.id);
+  const trophies = trophiesOf(state.scores, p.id, state.duels);
+  const duelWins = state.duels.filter((d) => d.winner === p.id).length;
   const events = [
     { label: '60 secondes', best: bestOf(state.scores, p.id, 'chrono', level, CHRONO_SECONDS), show: (s: { pairs: number }) => `${s.pairs} paires` },
     ...RACE_GOALS.map((g) => ({
@@ -126,7 +127,7 @@ export default function ProfilePage({ id, onBack }: Props) {
           ))}
         </div>
         <p className="profile-count">
-          {mine.length} concours · {trophies.size} trophée{trophies.size > 1 ? 's' : ''}
+          {mine.length} concours · {duelWins} duel{duelWins > 1 ? 's' : ''} gagné{duelWins > 1 ? 's' : ''} · {trophies.size} trophée{trophies.size > 1 ? 's' : ''}
         </p>
       </section>
       {saveError && <p className="feedback soft">Mémoire pleine : la dernière modification n'est pas gardée.</p>}

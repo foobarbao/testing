@@ -46,6 +46,7 @@ const TROPHY_ART: Record<string, string> = {
   gold: '★',
   hundred: '100',
   marathon: '∞',
+  duel: '1-0',
 };
 
 export function TrophyBadge({ trophy, earned, fresh }: { trophy: Trophy; earned: boolean; fresh?: boolean }) {
