@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Avatar from '../components/Avatar';
+import Handoff from '../components/Handoff';
 import { Back, Replay } from '../components/Icons';
 import { Crown, MEDAL_COLOR, MedalIcon, Podium, TrophyBadge } from '../components/Rewards';
 import { contestBoard, pairTarget, type Card, type TenLevel } from '../engine/tens';
@@ -29,7 +30,7 @@ interface Props {
   onProfile: (id: string) => void;
 }
 
-type Phase = 'setup' | 'countdown' | 'play' | 'end';
+type Phase = 'setup' | 'handoff' | 'countdown' | 'play' | 'end';
 interface Result {
   score: ContestScore;
   record: boolean;
@@ -51,6 +52,16 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
   const [run, setRun] = useState(0);
   const eventGoal = mode === 'chrono' ? CHRONO_SECONDS : goal;
   const board = leaderboard(state, mode, level, eventGoal);
+  // Joueur suivant dans la liste (pour « Au tour de Tom »).
+  const nextPlayer =
+    me && state.profiles.length > 1
+      ? state.profiles[(state.profiles.findIndex((p) => p.id === me.id) + 1) % state.profiles.length]
+      : null;
+
+  useEffect(() => {
+    if (phase === 'setup') say(me ? `${me.name}, touche C'est parti !` : 'Qui joue ? Touche le bouton orange.');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, me?.id]);
 
   const start = () => {
     if (!me) return onPlayers();
@@ -71,6 +82,20 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
     say(`Bravo ${me.name} ! ${what} !${out.champion ? ' Tu es le champion !' : out.record ? ' Nouveau record !' : ''}`);
   };
 
+  if (phase === 'handoff' && nextPlayer) {
+    return (
+      <Handoff
+        profile={nextPlayer}
+        onReady={() => {
+          actions.select(nextPlayer.id);
+          setResult(null);
+          setPhase('countdown');
+          setRun((r) => r + 1);
+        }}
+        onCancel={() => setPhase('end')}
+      />
+    );
+  }
   if (phase === 'countdown' && me) {
     return <Countdown key={run} me={me} onGo={() => setPhase('play')} />;
   }
@@ -93,6 +118,8 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
         me={me}
         result={result}
         rows={leaderboard(state, mode, level, eventGoal)}
+        next={nextPlayer}
+        onNext={() => setPhase('handoff')}
         onReplay={start}
         onPlayers={onPlayers}
         onMenu={() => setPhase('setup')}
@@ -115,8 +142,14 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
             <Avatar profile={me} size={64} ring={me.color} />
             <b>{me.name}</b>
           </button>
-          <button className="btn slim" onClick={onPlayers}>
-            Changer
+          <button className="btn slim change-player" onClick={onPlayers} aria-label="Changer de joueur">
+            {state.profiles
+              .filter((p) => p.id !== me.id)
+              .slice(0, 3)
+              .map((p) => (
+                <Avatar key={p.id} profile={p} size={30} />
+              ))}
+            {state.profiles.length < 2 && <span>+</span>}
           </button>
         </div>
       ) : (
@@ -126,10 +159,17 @@ export default function Contest({ level: startLevel, onBack, onPlayers, onProfil
       )}
 
       <div className="answer-tabs" role="tablist" aria-label="Épreuve">
-        <button role="tab" className="answer-tab big-tab" aria-selected={mode === 'chrono'} onClick={() => setMode('chrono')}>
+        <button role="tab" className="answer-tab big-tab icon-tab" aria-selected={mode === 'chrono'} onClick={() => setMode('chrono')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="13.5" r="8" />
+            <path d="M12 9v5l3 2M9.5 2.5h5" />
+          </svg>
           60 secondes
         </button>
-        <button role="tab" className="answer-tab big-tab" aria-selected={mode === 'race'} onClick={() => setMode('race')}>
+        <button role="tab" className="answer-tab big-tab icon-tab" aria-selected={mode === 'race'} onClick={() => setMode('race')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 21V3M5 4h12l-2.5 4L17 12H5" />
+          </svg>
           Course
         </button>
       </div>
@@ -352,6 +392,8 @@ function Reward({
   me,
   result,
   rows,
+  next,
+  onNext,
   onReplay,
   onPlayers,
   onMenu,
@@ -359,6 +401,8 @@ function Reward({
   me: Profile;
   result: Result;
   rows: ReturnType<typeof leaderboard>;
+  next: Profile | null;
+  onNext: () => void;
   onReplay: () => void;
   onPlayers: () => void;
   onMenu: () => void;
@@ -404,12 +448,23 @@ function Reward({
         <Podium rows={rows} highlight={me.id} />
       </section>
 
-      <div className="row-3">
-        <button className="btn" onClick={onMenu}>
-          Menu
+      {next && (
+        <button className="btn show big next-player" onClick={onNext}>
+          <Avatar profile={next} size={52} ring="#fff" />
+          Au tour de {next.name} !
         </button>
-        <button className="btn" onClick={onPlayers}>
-          Joueur
+      )}
+      <div className="row-3">
+        <button className="btn" onClick={onMenu} aria-label="Menu du concours">
+          <Back /> Menu
+        </button>
+        <button className="btn" onClick={onPlayers} aria-label="Choisir un autre joueur">
+          <svg viewBox="0 0 24 24" className="who-icon" aria-hidden="true">
+            <circle cx="8" cy="8" r="3.5" />
+            <circle cx="16.5" cy="9" r="3" />
+            <path d="M2 20c0-4 3-6 6-6s6 2 6 6M13 19c.5-3 2-4.5 3.5-4.5S21 16 21.5 19" />
+          </svg>
+          Joueurs
         </button>
         <button className="btn primary" onClick={onReplay}>
           <Replay /> Rejouer

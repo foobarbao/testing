@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { digitsOf } from '../engine/steps';
 import { useWidth } from '../lib/hooks';
 import { useSound } from '../lib/sound';
@@ -54,30 +54,117 @@ interface SceneProps {
   plus?: number;
 }
 
-/** La règle, la grenouille et ses bonds. */
+const MIN_PX = 0.25;
+const MAX_PX = 60;
+const MINORS = [1, 5, 10, 50, 100, 500];
+const LABELS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+const clampPx = (px: number) => Math.min(MAX_PX, Math.max(MIN_PX, px));
+
+/** Graduations adaptées au zoom : assez serrées pour compter, assez espacées pour lire. */
+function tickPlan(px: number) {
+  const minor = MINORS.find((m) => m * px >= 6) ?? 500;
+  const label = LABELS.find((l) => l * px >= 32 && l % minor === 0) ?? 1000;
+  return { minor, label };
+}
+
+const Loupe = ({ plus }: { plus: boolean }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="10" cy="10" r="6.5" />
+    <path d="M15 15l6 6M7 10h6" />
+    {plus && <path d="M10 7v6" />}
+  </svg>
+);
+
+/**
+ * La règle, la grenouille et ses bonds.
+ * L'enfant peut faire glisser la règle avec le doigt, la rapprocher ou l'éloigner
+ * (boutons loupe, ou deux doigts), puis revenir à la grenouille. Dès qu'elle bondit, la règle la suit.
+ */
 export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, flash, plus }: SceneProps) {
-  const z = ZOOM[zoomUnit] ?? ZOOM[1];
-  const half = width / 2 / z.px + z.minor * 2;
-  const lo = Math.max(0, Math.floor((Math.min(v, target) - half) / z.minor) * z.minor);
-  const hi = Math.max(v, target) + half;
+  const [userPx, setUserPx] = useState<number | null>(null);
+  const [pan, setPan] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const pointers = useRef(new Map<number, number>());
+  const gesture = useRef<{ x0: number; pan0: number; d0: number; px0: number } | null>(null);
+  const dragged = useRef(false);
+
+  // La grenouille bondit : on revient sur elle.
+  useEffect(() => setPan(0), [v]);
+
+  const px = userPx ?? (ZOOM[zoomUnit] ?? ZOOM[1]).px;
+  const { minor, label } = tickPlan(px);
+  const center = Math.min(1000, Math.max(0, v + pan));
+  const half = width / 2 / px + minor * 2;
+  const lo = Math.max(0, Math.floor((Math.min(center, v, target) - half) / minor) * minor);
+  const hi = Math.min(1000, Math.max(center, v, target) + half);
   const ticks: number[] = [];
-  for (let t = lo; t <= hi; t += z.minor) ticks.push(t);
-  const shift = width / 2 - v * z.px;
+  for (let t = lo; t <= hi; t += minor) ticks.push(t);
+  const shift = width / 2 - center * px;
+  const frogX = width / 2 + (v - center) * px;
+  const frogVisible = frogX > -20 && frogX < width + 20;
+  const moved = pan !== 0 || userPx !== null;
   const kind = (t: number) => (t % 100 === 0 ? 'c' : t % 10 === 0 ? 'd' : t % 5 === 0 ? 'five' : 'u');
 
+  const zoom = (factor: number) => setUserPx(clampPx(px * factor));
+
+  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    pointers.current.set(e.pointerId, e.clientX);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const xs = [...pointers.current.values()];
+    gesture.current = { x0: xs[0], pan0: pan, d0: xs.length > 1 ? Math.abs(xs[1] - xs[0]) || 1 : 1, px0: px };
+  };
+  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pointers.current.has(e.pointerId) || !gesture.current) return;
+    pointers.current.set(e.pointerId, e.clientX);
+    const xs = [...pointers.current.values()];
+    const g = gesture.current;
+    if (xs.length > 1) {
+      // Deux doigts : on rapproche ou on éloigne la règle.
+      dragged.current = true;
+      setUserPx(clampPx((g.px0 * Math.abs(xs[1] - xs[0])) / g.d0));
+      return;
+    }
+    const dx = xs[0] - g.x0;
+    if (!dragged.current && Math.abs(dx) < 8) return;
+    dragged.current = true;
+    setDragging(true);
+    setPan(g.pan0 - dx / px);
+  };
+  const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(e.pointerId);
+    const xs = [...pointers.current.values()];
+    gesture.current = xs.length ? { x0: xs[0], pan0: pan, d0: 1, px0: px } : null;
+    if (!xs.length) setDragging(false);
+  };
+
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
   return (
-    <>
+    <div
+      className={`ruler-scene ${dragging ? 'dragging' : ''}`}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+      onClickCapture={(e) => {
+        // Un glissement n'est pas un appui : il ne fait pas bondir la grenouille.
+        if (dragged.current) {
+          e.stopPropagation();
+          dragged.current = false;
+        }
+      }}
+    >
       <svg width={width} height={128} role="img" aria-label={`Règle graduée, la grenouille est sur ${v}`}>
-        <g className="ruler-track" style={{ transform: `translateX(${shift}px)`, transitionDuration: `${dur * 0.7}ms` }}>
-          <line x1={lo * z.px} x2={hi * z.px} y1={BASE} y2={BASE} className="ruler-base" />
+        <g className="ruler-track" style={{ transform: `translateX(${shift}px)`, transitionDuration: dragging ? '0ms' : `${dur * 0.7}ms` }}>
+          <line x1={lo * px} x2={hi * px} y1={BASE} y2={BASE} className="ruler-base" />
           {ticks.map((t) => {
             const k = kind(t);
             const h = k === 'c' ? 30 : k === 'd' ? 24 : k === 'five' ? 14 : 9;
             return (
               <g key={t}>
-                <line x1={t * z.px} x2={t * z.px} y1={BASE} y2={BASE - h} className={`tick ${k}`} />
-                {t % z.label === 0 && (
-                  <text x={t * z.px} y={BASE + 18} className={`tick-label ${k}`} textAnchor="middle">
+                <line x1={t * px} x2={t * px} y1={BASE} y2={BASE - h} className={`tick ${k}`} />
+                {t % label === 0 && (
+                  <text x={t * px} y={BASE + 18} className={`tick-label ${k}`} textAnchor="middle">
                     {t}
                   </text>
                 )}
@@ -85,16 +172,16 @@ export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, f
             );
           })}
           <g className="start-flag">
-            <line x1={start * z.px} x2={start * z.px} y1={BASE} y2={BASE + 28} />
-            <text x={start * z.px + 4} y={BASE + 34}>
+            <line x1={start * px} x2={start * px} y1={BASE} y2={BASE + 28} />
+            <text x={start * px + 4} y={BASE + 34}>
               départ
             </text>
           </g>
           {hops
-            .filter((h) => Math.max(h.from, h.to) <= Math.max(v, start) && Math.abs(h.to - h.from) * z.px >= 6)
+            .filter((h) => Math.max(h.from, h.to) <= Math.max(v, start) && Math.abs(h.to - h.from) * px >= 6)
             .map((h, i) => {
-              const x1 = h.from * z.px;
-              const x2 = h.to * z.px;
+              const x1 = h.from * px;
+              const x2 = h.to * px;
               const lift = Math.min(46, Math.abs(x2 - x1) * 0.6);
               return (
                 <g key={`${i}-${h.from}-${h.rank}`} className={`hop ${RANK_CLASS[h.rank]} ${h.comp ? 'comp' : ''}`}>
@@ -109,30 +196,58 @@ export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, f
             })}
         </g>
       </svg>
-      <div className="frog-wrap" style={{ left: width / 2 }}>
-        <svg key={v} className="frog" viewBox="0 0 48 40" aria-hidden="true">
-          <ellipse cx="24" cy="26" rx="17" ry="12" className="frog-body" />
-          <circle cx="15" cy="13" r="6.5" className="frog-body" />
-          <circle cx="33" cy="13" r="6.5" className="frog-body" />
-          <circle cx="15" cy="12" r="3.6" fill="#fff" />
-          <circle cx="33" cy="12" r="3.6" fill="#fff" />
-          <circle cx="16" cy="13" r="1.8" fill="#1D2742" />
-          <circle cx="34" cy="13" r="1.8" fill="#1D2742" />
-          <path d="M17 28q7 5 14 0" fill="none" stroke="#1D2742" strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
-        <span className="frog-value">{v}</span>
-      </div>
-      {plus !== undefined && plus > 0 && (
-        <span className="plus-chip on ruler-plus" style={{ left: width / 2 + 26 }}>
+      {frogVisible && (
+        <div className={`frog-wrap ${dragging ? 'still' : ''}`} style={{ left: frogX }}>
+          <svg key={v} className="frog" viewBox="0 0 48 40" aria-hidden="true">
+            <ellipse cx="24" cy="26" rx="17" ry="12" className="frog-body" />
+            <circle cx="15" cy="13" r="6.5" className="frog-body" />
+            <circle cx="33" cy="13" r="6.5" className="frog-body" />
+            <circle cx="15" cy="12" r="3.6" fill="#fff" />
+            <circle cx="33" cy="12" r="3.6" fill="#fff" />
+            <circle cx="16" cy="13" r="1.8" fill="#1D2742" />
+            <circle cx="34" cy="13" r="1.8" fill="#1D2742" />
+            <path d="M17 28q7 5 14 0" fill="none" stroke="#1D2742" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
+          <span className="frog-value">{v}</span>
+        </div>
+      )}
+      {frogVisible && plus !== undefined && plus > 0 && (
+        <span className="plus-chip on ruler-plus" style={{ left: frogX + 26 }}>
           +{plus}
         </span>
       )}
-      {flash && (
-        <span key={flash.id} className={`ruler-flash ${RANK_CLASS[flash.rank]} ${flash.text ? 'comp' : ''}`} style={{ left: width / 2 }}>
+      {flash && frogVisible && (
+        <span key={flash.id} className={`ruler-flash ${RANK_CLASS[flash.rank]} ${flash.text ? 'comp' : ''}`} style={{ left: frogX }}>
           {flash.text ?? `+1 ${flash.rank === 1 ? 'dizaine' : 'centaine'} !`}
         </span>
       )}
-    </>
+      <div className="ruler-tools" onPointerDown={stop} onClick={stop}>
+        <button className="rt-btn" onClick={() => zoom(0.5)} disabled={px <= MIN_PX} aria-label="Éloigner la règle">
+          <Loupe plus={false} />
+        </button>
+        <button className="rt-btn" onClick={() => zoom(2)} disabled={px >= MAX_PX} aria-label="Rapprocher la règle">
+          <Loupe plus />
+        </button>
+        {moved && (
+          <button
+            className={`rt-btn home ${frogVisible ? '' : 'pulse'}`}
+            onClick={() => {
+              setPan(0);
+              setUserPx(null);
+            }}
+            aria-label="Revenir à la grenouille"
+          >
+            <svg viewBox="0 0 48 40" aria-hidden="true">
+              <ellipse cx="24" cy="26" rx="17" ry="12" className="frog-body" />
+              <circle cx="15" cy="13" r="6.5" className="frog-body" />
+              <circle cx="33" cy="13" r="6.5" className="frog-body" />
+              <circle cx="15" cy="12" r="3.6" fill="#fff" />
+              <circle cx="33" cy="12" r="3.6" fill="#fff" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

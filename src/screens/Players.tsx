@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Avatar from '../components/Avatar';
+import Handoff from '../components/Handoff';
 import { Back } from '../components/Icons';
 import Photobooth from '../components/Photobooth';
-import { PROFILE_COLORS, useProfiles } from '../lib/profiles';
+import { PROFILE_COLORS, useProfiles, type Profile } from '../lib/profiles';
 import { useSay } from '../lib/speech';
 
 interface Props {
@@ -19,6 +20,26 @@ export default function Players({ onBack, onDone, onEdit }: Props) {
   const [step, setStep] = useState<'list' | 'name' | 'photo'>(state.profiles.length ? 'list' : 'name');
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROFILE_COLORS[state.profiles.length % PROFILE_COLORS.length]);
+  const [handoff, setHandoff] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    if (step === 'list') say('Qui joue ? Touche ta photo.');
+    if (step === 'name') say('Écris ton prénom.');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  if (handoff) {
+    return (
+      <Handoff
+        profile={handoff}
+        onReady={() => {
+          actions.select(handoff.id);
+          onDone();
+        }}
+        onCancel={() => setHandoff(null)}
+      />
+    );
+  }
 
   const create = (photo?: string) => {
     const p = actions.add(name, color, photo);
@@ -96,6 +117,8 @@ export default function Players({ onBack, onDone, onEdit }: Props) {
             <button
               className="player-pick"
               onClick={() => {
+                // Un autre enfant prend la main : on lui fait passer le téléphone.
+                if (state.current && state.current !== p.id) return setHandoff(p);
                 actions.select(p.id);
                 say(`C'est parti ${p.name} !`);
                 onDone();
