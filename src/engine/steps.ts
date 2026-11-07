@@ -92,8 +92,7 @@ function buildAddition(ex: Exercise): Lesson {
         kind: 'group',
         col: c,
         unit,
-        say: `On a ${total} ${PLURAL[c]}. Avec 10 ${PLURAL[c]}… que fait-on ?`,
-        ask: 'que fait-on ?',
+        say: `Voilà 10 ${PLURAL[c]} ensemble : ça fait 1 ${SINGULAR[c + 1]} !`,
         note: [
           { t: String(total), tone },
           { t: ' = ' },

@@ -5,7 +5,7 @@ import { RANK_TONE, digitsOf } from '../engine/steps';
 import { useSound } from '../lib/sound';
 import { canSpeak, speak, useSay } from '../lib/speech';
 import type { BuildModel, Prefs } from '../lib/storage';
-import BuildPanel from '../play/BuildPanel';
+import BuildPanel, { type Prompt } from '../play/BuildPanel';
 import { colsFor } from '../play/model';
 import { Burst } from './Exercise';
 
@@ -84,20 +84,20 @@ export default function Build({ prefs, update, onBack }: Props) {
     newRound(t);
   };
 
-  const prompt = (m: BuildModel) => {
+  const prompt = (m: BuildModel): Prompt => {
     if (loose) {
       return {
-        sticks: `Voici ${target} bâtonnets. Range-les : fais un fagot avec 10 bâtonnets !`,
-        money: `Voici ${target} pièces de 1 €. Va à la banque pour les échanger !`,
-        abacus: `Il y a ${target} perles vertes. Échange 10 perles vertes contre 1 perle bleue !`,
+        sticks: { text: 'Range les bâtonnets', voice: `Voici ${target} bâtonnets. Range-les : fais un fagot avec 10 bâtonnets !` },
+        money: { text: 'Va à la banque', voice: `Voici ${target} pièces de 1 euro. Va à la banque pour les échanger !` },
+        abacus: { text: 'Échange 10 perles', voice: `Il y a ${target} perles vertes. Échange 10 perles vertes contre 1 perle bleue !` },
       }[m as 'sticks' | 'money' | 'abacus'];
     }
     return {
-      sticks: `Construis ${target} avec des fagots et des bâtonnets.`,
-      money: `Fais ${target} € avec des billets et des pièces.`,
-      abacus: `Mets des perles pour montrer ${target}.`,
-      ruler: `Fais avancer la grenouille jusqu'à ${target} avec des petits et des grands bonds.`,
-      gears: `Tourne les roues pour que le compteur affiche ${target}.`,
+      sticks: { text: `Fais ${target}`, voice: `Construis ${target} avec des fagots et des bâtonnets.` },
+      money: { text: `Fais ${target} €`, voice: `Fais ${target} euros avec des billets et des pièces.` },
+      abacus: { text: `Fais ${target}`, voice: `Mets des perles pour montrer ${target}.` },
+      ruler: { text: `Va jusqu'à ${target}`, voice: `Fais avancer la grenouille jusqu'à ${target}, avec des petits et des grands bonds.` },
+      counter: { text: `Affiche ${target}`, voice: `Tape sur les chiffres pour que le compteur affiche ${target}.` },
     }[m];
   };
 
@@ -158,7 +158,7 @@ export default function Build({ prefs, update, onBack }: Props) {
                 .reverse()}
             </div>
             {canSpeak && (
-              <button className="icon-btn listen" onClick={() => speak(prompt(model))} aria-label="Écouter la consigne">
+              <button className="icon-btn listen" onClick={() => speak(prompt(model).voice)} aria-label="Écouter la consigne">
                 <Speaker />
               </button>
             )}

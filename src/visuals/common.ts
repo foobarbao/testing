@@ -1,10 +1,21 @@
 import type { Lesson, Step } from '../engine/types';
 
+/** Le geste attendu de l'enfant pour passer à l'étape suivante. */
+export interface Gesture {
+  next: Step;
+  /** Montrer la main qui indique le geste. */
+  hint: boolean;
+  onDone: () => void;
+  onWrong: () => void;
+}
+
 export interface VisualProps {
   lesson: Lesson;
   step: number;
   /** Durée d'une animation, en millisecondes (dépend du réglage de vitesse). */
   dur: number;
+  /** Présent quand c'est à l'enfant d'agir sur le visuel. */
+  gesture?: Gesture;
 }
 
 export const RANK_LABEL = ['Unités', 'Dizaines', 'Centaines'];

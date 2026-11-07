@@ -71,7 +71,7 @@ export default function CalcEntry({ onBack, onStart }: Props) {
         </button>
         <h1 className="bar-title">Mon calcul</h1>
       </header>
-      <p className="screen-lead">Recopie le calcul de tes devoirs</p>
+      <p className="screen-lead">Tape ton calcul</p>
 
       <div className="calc entry" aria-live="polite">
         <button className={`entry-box ${field === 'a' ? 'on' : ''}`} onClick={() => setField('a')} aria-label="Premier nombre">
@@ -96,7 +96,6 @@ export default function CalcEntry({ onBack, onStart }: Props) {
           C'est parti !
         </button>
       </div>
-      <p className="picker-tip">Une addition de deux nombres, avec un résultat jusqu'à 999.</p>
     </main>
   );
 }

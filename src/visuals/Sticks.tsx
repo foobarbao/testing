@@ -1,5 +1,6 @@
 import { useWidth } from '../lib/hooks';
-import { Columns, Extras, Pieces } from './Board';
+import { Columns, Extras, Pieces, columnRects } from './Board';
+import { GestureLayer } from './Gesture';
 import type { VisualProps } from './common';
 import { layoutPieces, type PiecesConfig } from './pieces';
 
@@ -19,7 +20,7 @@ export const STICKS_CONFIG: PiecesConfig = {
 };
 
 /** Bâtonnets, fagots de 10 et gros paquets de 100. */
-export default function Sticks({ lesson, step }: VisualProps) {
+export default function Sticks({ lesson, step, gesture }: VisualProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const layout = width ? layoutPieces(lesson, step, width, STICKS_CONFIG) : null;
   return (
@@ -28,6 +29,7 @@ export default function Sticks({ lesson, step }: VisualProps) {
         <Columns lesson={lesson} step={step} width={width} height={layout.height}>
           <Pieces items={layout.items} />
           <Extras extras={layout.extras} />
+          {gesture && <GestureLayer rects={columnRects(lesson.n, width)} height={layout.height} gesture={gesture} />}
         </Columns>
       )}
     </div>

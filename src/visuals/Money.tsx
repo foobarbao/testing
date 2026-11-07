@@ -1,5 +1,6 @@
 import { useWidth } from '../lib/hooks';
-import { Columns, Extras, Pieces } from './Board';
+import { Columns, Extras, Pieces, columnRects } from './Board';
+import { GestureLayer } from './Gesture';
 import type { VisualProps } from './common';
 import { layoutPieces, type PiecesConfig } from './pieces';
 
@@ -21,7 +22,7 @@ export const MONEY_CONFIG: PiecesConfig = {
 export const MONEY_LABEL = ['1€', '10 €', '100 €'];
 
 /** Pièces de 1 €, billets de 10 € et de 100 €, échangés à la banque. */
-export default function Money({ lesson, step }: VisualProps) {
+export default function Money({ lesson, step, gesture }: VisualProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const layout = width ? layoutPieces(lesson, step, width, MONEY_CONFIG) : null;
   return (
@@ -30,6 +31,7 @@ export default function Money({ lesson, step }: VisualProps) {
         <Columns lesson={lesson} step={step} width={width} height={layout.height}>
           <Pieces items={layout.items} render={(p) => <span>{MONEY_LABEL[p.rank]}</span>} />
           <Extras extras={layout.extras} />
+          {gesture && <GestureLayer rects={columnRects(lesson.n, width)} height={layout.height} gesture={gesture} />}
         </Columns>
       )}
     </div>

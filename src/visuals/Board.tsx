@@ -65,6 +65,11 @@ export function Columns({ lesson, step, width, height, children, counts = true }
   );
 }
 
+/** Rectangles des colonnes pour la couche de gestes. */
+export function columnRects(n: number, width: number) {
+  return Array.from({ length: n }, (_, c) => ({ c, left: colLeft(c, n, width), width: width / n }));
+}
+
 export function Pieces({ items, render }: { items: Placed[]; render?: (p: Placed) => ReactNode }) {
   return (
     <>

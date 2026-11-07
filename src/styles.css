@@ -646,63 +646,13 @@ h1, h2 { margin: 0; }
   100% { opacity: 0; translate: 0 -8px; }
 }
 
-/* Roues */
-.odometer { display: flex; justify-content: center; gap: 4px; padding: 4px 0 2px; }
-.odo-digit {
-  width: 42px;
-  height: 52px;
-  border-radius: 10px;
-  background: var(--ink);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  font: 700 34px/1 var(--font-display);
-  font-variant-numeric: tabular-nums;
-}
-.odo-digit.u { color: #7BE3A7; }
-.odo-digit.d { color: #9CC5FA; }
-.odo-digit.c { color: #CDB2F7; }
-.odo-roll { display: block; animation: roll calc(var(--dur) * 0.5) ease-out; }
-@keyframes roll { from { transform: translateY(70%); opacity: 0; } }
-.gear-row { display: flex; justify-content: center; }
-.gear-cell { position: relative; display: flex; flex-direction: column; align-items: center; border-radius: 16px; transition: background-color var(--dur); padding-top: 4px; }
-.gear-cell.hl { background: var(--hl); }
-.gear-name { font: 600 13px var(--font-display); }
-.gear-name.u { color: var(--units); }
-.gear-name.d { color: var(--tens); }
-.gear-name.c { color: var(--hundreds); }
-.gear-svg { overflow: visible; display: block; }
-.gear { transition-property: transform; transition-timing-function: cubic-bezier(0.5, 0, 0.3, 1.3); }
-.gear-body { stroke-width: 3; stroke-linejoin: round; }
-.gear.u .gear-body { fill: var(--units-soft); stroke: var(--units); }
-.gear.d .gear-body { fill: var(--tens-soft); stroke: var(--tens); }
-.gear.c .gear-body { fill: var(--hundreds-soft); stroke: var(--hundreds); }
-.gear.u .gear-hub { fill: var(--units); }
-.gear.d .gear-hub { fill: var(--tens); }
-.gear.c .gear-hub { fill: var(--hundreds); }
-.gear-digit { fill: var(--ink); font: 700 13px var(--font-display); }
-.driver { fill: var(--carry); stroke: color-mix(in srgb, var(--carry) 60%, #000); stroke-width: 1.5; }
-.gear-window { fill: none; stroke: var(--carry); stroke-width: 3; }
-.gear-pointer { fill: var(--ink); }
-.gear-clic {
-  position: absolute;
-  top: 30px;
-  right: 2px;
-  background: var(--carry);
-  color: var(--on-accent);
-  font: 700 13px var(--font-display);
-  padding: 2px 8px;
-  border-radius: 999px;
-  animation: flash 1.2s ease-out forwards;
-}
-
 @media (prefers-reduced-motion: reduce) {
   :root { --dur: 1ms !important; }
   .pc.grouped, .frog, .odo-roll, .burst svg, .btn.pulse, .answer.shake { animation: none; }
 }
 
 /* ---------- accueil : cartes secondaires ---------- */
-@media (min-width: 560px) { .op-card.add { grid-column: 1 / -1; } }
+
 .op-card.small {
   min-height: 0;
   grid-template-rows: auto auto;
@@ -714,7 +664,9 @@ h1, h2 { margin: 0; }
 .op-sign.small { width: 54px; height: 54px; border-radius: 18px; font-size: 40px; color: var(--on-accent); }
 .op-card.small .op-name { font-size: 22px; }
 .op-hint { font-size: 14px; color: var(--muted); }
-.op-card.mine .op-sign { background: var(--carry); }
+.op-card.mine { background: var(--carry); color: var(--on-accent); box-shadow: 0 5px 0 color-mix(in srgb, var(--carry) 65%, #000); min-height: 120px; }
+.op-card.mine .op-sign { background: rgba(255, 255, 255, 0.2); }
+.op-card.mine .op-hint { color: inherit; opacity: 0.85; }
 .op-card.build .op-sign { background: var(--units); }
 .op-card.sub .op-sign { background: var(--surface-2); color: var(--muted); }
 .op-card.sub .op-name { color: var(--muted); }
@@ -818,7 +770,6 @@ h1, h2 { margin: 0; }
 .hop-btn.r1 { color: var(--tens); }
 .hop-btn.r2 { color: var(--hundreds); }
 .hop-count { margin: 6px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
-.gears .pm { margin-top: 4px; }
 
 /* ---------- je pose ---------- */
 .pose-answer { display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -885,3 +836,115 @@ h1, h2 { margin: 0; }
 }
 .entry-box.on { border-style: solid; border-color: var(--tens); box-shadow: 0 0 0 4px var(--tens-soft); }
 .btn.plus-key { font-size: 30px; }
+
+/* ---------- un visuel à la fois ---------- */
+.vis-tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.vis-tabs.five { grid-template-columns: repeat(5, 1fr); }
+.vis-tab {
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 2px;
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 0 var(--line);
+}
+.vis-tab .vicon { width: 44px; height: 34px; }
+.vis-tab[aria-selected='true'] { border-color: var(--tens); background: var(--tens-soft); }
+.panel.stage { position: relative; }
+.panel.stage.your-turn { box-shadow: 0 0 0 3px var(--carry-soft), 0 2px 0 var(--line); }
+
+/* ---------- gestes de l'enfant ---------- */
+.gesture-layer { position: absolute; left: 0; right: 0; top: 0; z-index: 5; }
+.g-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 14px;
+  touch-action: none;
+  cursor: pointer;
+}
+.g-col.target { box-shadow: inset 0 0 0 3px var(--carry); animation: target 1.2s ease-in-out infinite; }
+.g-col.source { box-shadow: inset 0 0 0 2px var(--carry); }
+@keyframes target { 50% { box-shadow: inset 0 0 0 5px var(--carry), 0 0 0 4px var(--carry-soft); } }
+.g-arrow { position: absolute; height: 40px; overflow: visible; pointer-events: none; }
+.g-arrow path { fill: none; stroke: var(--carry); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.hand { position: absolute; width: 34px; height: 40px; z-index: 6; pointer-events: none; animation: tap 1s ease-in-out infinite; }
+.hand.slide { animation: slide 1.6s ease-in-out infinite; }
+.hand-shape { fill: #FFFFFF; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+@keyframes tap { 50% { transform: translateY(8px) scale(0.92); } }
+@keyframes slide {
+  0%, 15% { transform: translateX(0); opacity: 0; }
+  25% { opacity: 1; }
+  80% { transform: translateX(var(--slide)); opacity: 1; }
+  100% { transform: translateX(var(--slide)); opacity: 0; }
+}
+.vis .pc { pointer-events: none; }
+.play-board .pc { pointer-events: auto; }
+.carry-digit.ready { opacity: 1; }
+
+.guide-short { margin: 0; flex: 1; min-width: 0; font: 700 24px/1.2 var(--font-display); text-wrap: balance; }
+.btn-hand { width: 20px; height: 24px; fill: #FFFFFF; stroke: var(--ink); stroke-width: 2.5; }
+
+/* Règle : on tape pour faire bondir la grenouille */
+.ruler-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ruler-wrap .vis.ruler { width: 100%; }
+.vis.ruler.tappable { cursor: pointer; border-radius: 16px; box-shadow: inset 0 0 0 3px var(--carry); animation: target 1.2s ease-in-out infinite; }
+.hop-size {
+  position: absolute;
+  top: 46px;
+  font: 700 18px var(--font-display);
+  background: var(--surface);
+  padding: 0 6px;
+  border-radius: 999px;
+}
+.tap-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.tap-dots i { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid currentColor; opacity: 0.5; }
+.tap-dots i.on { background: currentColor; opacity: 1; }
+.tap-dots.u, .counter-col .tap-dots { color: var(--units); }
+.tap-dots.d { color: var(--tens); }
+.tap-dots.c { color: var(--hundreds); }
+
+/* Compteur à gros chiffres */
+.counter { display: flex; justify-content: center; gap: 10px; padding: 6px 0 4px; }
+.counter-col { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 16px; padding: 4px; transition: background-color var(--dur); }
+.counter-col.hl { background: var(--hl); }
+.counter-name { font: 600 13px var(--font-display); }
+.counter-digit {
+  position: relative;
+  width: clamp(64px, 22vw, 92px);
+  height: clamp(86px, 28vw, 120px);
+  border: 0;
+  border-radius: 18px;
+  background: var(--ink);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font: 700 clamp(56px, 18vw, 80px) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.25);
+}
+.counter-digit:disabled { cursor: default; opacity: 1; }
+.counter-digit.u { color: #7BE3A7; }
+.counter-digit.d { color: #9CC5FA; }
+.counter-digit.c { color: #CDB2F7; }
+.counter-digit.target { box-shadow: 0 0 0 4px var(--carry), inset 0 -8px 0 rgba(0, 0, 0, 0.25); animation: pulse 1.2s ease-in-out infinite; }
+.counter-digit.bump { animation: bump calc(var(--dur) * 0.8) ease-out; }
+@keyframes bump { 40% { transform: translateY(-8px) scale(1.06); } }
+.counter-digit .roll { display: block; animation: roll calc(var(--dur) * 0.5) ease-out; }
+@keyframes roll { from { transform: translateY(60%); opacity: 0; } }
+.counter-clic {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--carry);
+  color: var(--on-accent);
+  font: 700 12px/1 var(--font-display);
+  padding: 3px 7px;
+  border-radius: 999px;
+  animation: flash 1.2s ease-out forwards;
+}
+.counter-col .hand { left: 50%; top: 60%; margin-left: -6px; }

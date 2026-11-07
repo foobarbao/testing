@@ -1,12 +1,13 @@
 import { digitsOf } from '../engine/steps';
 import { RANK_CLASS, activeCol, carryStepIndex, type VisualProps } from './common';
+import { GestureLayer } from './Gesture';
 
 const CELL = 46;
 const OP = 38;
 const ROW = { carry: 2, a: 32, b: 80, rule: 132, res: 138 };
 
 /** L'addition posée en colonnes, avec la retenue qui s'envole. */
-export default function Posee({ lesson, step }: VisualProps) {
+export default function Posee({ lesson, step, gesture }: VisualProps) {
   const s = lesson.steps[step];
   const { n } = lesson;
   const act = activeCol(s);
@@ -48,16 +49,25 @@ export default function Posee({ lesson, step }: VisualProps) {
           const at = carryStepIndex(lesson, i);
           if (at < 0) return null;
           const on = step >= at;
+          // Juste avant la retenue, le 1 attend à côté de la colonne : l'enfant le fait glisser.
+          const ready = step === at - 1;
           return (
             <span
               key={`k${i}`}
-              className={`carry-digit ${on ? 'on' : ''}`}
+              className={`carry-digit ${on ? 'on' : ''} ${ready ? 'ready' : ''}`}
               style={on ? { left: x(i + 1), top: ROW.carry } : { left: x(i) - 14, top: ROW.res + 4 }}
             >
               1
             </span>
           );
         })}
+        {gesture && (
+          <GestureLayer
+            rects={Array.from({ length: n }, (_, c) => ({ c, left: x(c), width: CELL }))}
+            height={ROW.res + 50}
+            gesture={gesture}
+          />
+        )}
       </div>
       <p className="posee-note" aria-live="polite">
         {s.note.map((seg, i) => (

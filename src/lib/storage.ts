@@ -1,19 +1,20 @@
 import { useCallback, useState } from 'react';
 
-export type VisualId = 'sticks' | 'posee' | 'ruler' | 'gears' | 'abacus' | 'money';
+export type VisualId = 'sticks' | 'posee' | 'ruler' | 'counter' | 'abacus' | 'money';
 
 /** Façon de donner la réponse à un calcul. */
 export type AnswerMode = 'keypad' | 'posee' | 'manip' | 'choice';
 
 /** Modèle utilisé pour construire un nombre ou manipuler la réponse. */
-export type BuildModel = 'sticks' | 'money' | 'abacus' | 'ruler' | 'gears';
+export type BuildModel = 'sticks' | 'money' | 'abacus' | 'ruler' | 'counter';
 
 export interface Prefs {
   ver: number;
   speed: number;
   sound: boolean;
   voice: boolean;
-  visuals: VisualId[];
+  /** Le visuel affiché (un seul à la fois). */
+  visual: VisualId;
   answerMode: AnswerMode;
   buildModel: BuildModel;
   /** Étoiles gagnées par niveau, pour l'addition. */
@@ -23,14 +24,14 @@ export interface Prefs {
 }
 
 const KEY = 'retenue:v1';
-const VERSION = 2;
+const VERSION = 3;
 
 export const DEFAULT_PREFS: Prefs = {
   ver: VERSION,
   speed: 1,
   sound: true,
   voice: true,
-  visuals: ['sticks', 'posee'],
+  visual: 'sticks',
   answerMode: 'keypad',
   buildModel: 'sticks',
   stars: {},
@@ -45,6 +46,13 @@ function load(): Prefs {
     const prefs: Prefs = { ...DEFAULT_PREFS, ...saved };
     // Version 2 : la voix est activée par défaut, y compris pour les réglages déjà enregistrés.
     if (!saved.ver || saved.ver < 2) prefs.voice = true;
+    // Version 3 : un seul visuel à la fois, et le compteur remplace les roues dentées.
+    if (!saved.ver || saved.ver < 3) {
+      const first = Array.isArray(saved.visuals) ? saved.visuals[0] : undefined;
+      prefs.visual = first === 'gears' ? 'counter' : (first ?? 'sticks');
+      if (saved.buildModel === 'gears') prefs.buildModel = 'counter';
+      delete (prefs as Partial<Prefs> & { visuals?: unknown }).visuals;
+    }
     prefs.ver = VERSION;
     return prefs;
   } catch {

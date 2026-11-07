@@ -40,6 +40,8 @@ export interface Names {
   article: string[];
   groupVerb: string[];
   breakVerb: string[];
+  /** Consigne très courte quand une colonne a 10 éléments ou plus. */
+  groupShort: string[];
 }
 
 export const STICK_NAMES: Names = {
@@ -48,6 +50,7 @@ export const STICK_NAMES: Names = {
   article: ['un bâtonnet', 'un fagot', 'un gros paquet'],
   groupVerb: ['Faire un fagot', 'Faire un paquet'],
   breakVerb: ['', 'Défaire le fagot', 'Défaire le paquet'],
+  groupShort: ['Fais un fagot !', 'Fais un paquet !'],
 };
 
 export const MONEY_NAMES: Names = {
@@ -56,6 +59,7 @@ export const MONEY_NAMES: Names = {
   article: ['une pièce de 1 €', 'un billet de 10 €', 'un billet de 100 €'],
   groupVerb: ['Échanger contre 10 €', 'Échanger contre 100 €'],
   breakVerb: ['', 'Faire la monnaie', 'Faire la monnaie'],
+  groupShort: ['Va à la banque !', 'Va à la banque !'],
 };
 
 export const BEAD_NAMES: Names = {
@@ -64,6 +68,7 @@ export const BEAD_NAMES: Names = {
   article: ['une perle verte', 'une perle bleue', 'une perle violette'],
   groupVerb: ['Échanger 10 perles', 'Échanger 10 perles'],
   breakVerb: ['', 'Casser en 10', 'Casser en 10'],
+  groupShort: ['Échange 10 perles !', 'Échange 10 perles !'],
 };
 
 const RANK = ['unités', 'dizaines', 'centaines'];
@@ -83,7 +88,10 @@ export interface Verdict {
   ok: boolean;
   /** Le total est juste mais une colonne a 10 éléments ou plus. */
   untidy?: number;
+  /** Phrase complète, lue par la voix. */
   text: string;
+  /** Trois ou quatre mots affichés à l'écran. */
+  short: string;
 }
 
 /**
@@ -93,18 +101,19 @@ export interface Verdict {
 export function judgeCounts(c: Counts, target: number, names: Names, reveal: boolean): Verdict {
   const v = valueOf(c);
   if (v === target) {
-    if (isTidy(c)) return { ok: true, text: `Bravo ! ${target}, c'est ${decompose(target, c.length)}.` };
+    if (isTidy(c)) return { ok: true, short: 'Bravo !', text: `Bravo ! ${target}, c'est ${decompose(target, c.length)}.` };
     const r = c.findIndex((k) => k >= 10);
     return {
       untidy: r,
       ok: false,
+      short: names.groupShort[r],
       text: `Presque ! Il y a ${c[r]} ${names.many[r]} : avec 10 ${names.many[r]}, on fait ${names.article[r + 1]}.`,
     };
   }
   if (reveal) {
     return v < target
-      ? { ok: false, text: `Pas encore : ça fait ${v}. On veut ${target}, il en manque.` }
-      : { ok: false, text: `Un peu trop : ça fait ${v}. On veut ${target}.` };
+      ? { ok: false, short: 'Il en manque', text: `Pas encore : ça fait ${v}. On veut ${target}, il en manque.` }
+      : { ok: false, short: "C'est trop", text: `Un peu trop : ça fait ${v}. On veut ${target}.` };
   }
-  return { ok: false, text: `Ça fait ${v}. Vérifie ce que tu as ajouté.` };
+  return { ok: false, short: `Ça fait ${v}`, text: `Ça fait ${v}. Vérifie ce que tu as ajouté.` };
 }

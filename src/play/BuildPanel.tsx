@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Replay, VisualIcon } from '../components/Icons';
 import { useWidth } from '../lib/hooks';
 import { useSound } from '../lib/sound';
 import { useSay } from '../lib/speech';
 import type { BuildModel } from '../lib/storage';
-import { GearsScene } from '../visuals/Gears';
+import { CounterScene } from '../visuals/Counter';
 import { RulerScene, type Hop } from '../visuals/Ruler';
 import CountsBoard from './CountsBoard';
 import type { Anim, Ids } from './layout';
@@ -27,22 +28,28 @@ export const MODELS: { id: BuildModel; name: string }[] = [
   { id: 'money', name: 'Monnaie' },
   { id: 'abacus', name: 'Boulier' },
   { id: 'ruler', name: 'Règle' },
-  { id: 'gears', name: 'Roues' },
+  { id: 'counter', name: 'Compteur' },
 ];
 
 const NAMES: Record<string, Names> = { sticks: STICK_NAMES, money: MONEY_NAMES, abacus: BEAD_NAMES };
 
+/** Consigne : quelques mots à l'écran, une phrase complète pour la voix. */
+export interface Prompt {
+  text: string;
+  voice: string;
+}
+
 interface Props {
   /** Nombre de colonnes. */
   n: number;
-  /** Ce qui est posé au départ (pour la règle et les roues : sa valeur). */
+  /** Ce qui est posé au départ (pour la règle et le compteur : sa valeur). */
   start: Counts;
   target: number;
   /** Peut-on dire le nombre visé dans les indices ? */
   reveal: boolean;
   model: BuildModel;
   onModel: (m: BuildModel) => void;
-  prompt: (m: BuildModel) => string;
+  prompt: (m: BuildModel) => Prompt;
   /** Change quand on passe à un autre nombre ou calcul. */
   resetKey: string;
   dur: number;
@@ -71,7 +78,7 @@ export default function BuildPanel(props: Props) {
   const [hintCol, setHintCol] = useState(-1);
   const [fb, setFb] = useState<Feedback>({ text: '', tone: '' });
   const [hops, setHops] = useState<Hop[]>([]);
-  const [gv, setGv] = useState(startValue);
+  const [cv, setCv] = useState(startValue);
   const [flash, setFlash] = useState<{ id: number; rank: number } | null>(null);
 
   const clearTimers = () => {
@@ -82,7 +89,7 @@ export default function BuildPanel(props: Props) {
 
   // Nouveau nombre ou nouveau modèle : on repart de la situation de départ.
   const startKey = start.join(',');
-  useEffect(() => {
+  const reset = () => {
     clearTimers();
     setIds(makeIds(start));
     setAnim(null);
@@ -90,8 +97,11 @@ export default function BuildPanel(props: Props) {
     setHintCol(-1);
     setFb({ text: '', tone: '' });
     setHops([]);
-    setGv(startValue);
-    say(props.prompt(model));
+    setCv(startValue);
+  };
+  useEffect(() => {
+    reset();
+    say(props.prompt(model).voice);
     return clearTimers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.resetKey, model, startKey]);
@@ -100,9 +110,9 @@ export default function BuildPanel(props: Props) {
   const names = NAMES[model] ?? STICK_NAMES;
   const locked = solved;
 
-  const soft = (text: string) => {
-    setFb({ text, tone: 'soft' });
-    say(text);
+  const soft = (short: string, voice = short) => {
+    setFb({ text: short, tone: 'soft' });
+    say(voice);
   };
   const touched = () => {
     if (fb.tone) setFb({ text: '', tone: '' });
@@ -110,7 +120,7 @@ export default function BuildPanel(props: Props) {
 
   // ---------- éléments à regrouper ----------
   const onAdd = (r: number) => {
-    if (!canAdd(counts, r)) return soft(`Cette colonne est pleine : regroupe d'abord 10 ${names.many[r]}.`);
+    if (!canAdd(counts, r)) return soft(names.groupShort[r] ?? 'Plein !', `Cette colonne est pleine : regroupe d'abord 10 ${names.many[r]}.`);
     const id = `p${nextId.current++}`;
     setIds((prev) => prev.map((l, c) => (c === r ? [...l, id] : l)));
     setFresh(new Set([id]));
@@ -162,7 +172,7 @@ export default function BuildPanel(props: Props) {
   const frog = startValue + hops.reduce((acc, h) => acc + (h.to - h.from), 0);
   const hop = (rank: number) => {
     const size = 10 ** rank;
-    if (frog + size > 999) return soft('La règle s’arrête à 999.');
+    if (frog + size > 999) return;
     const next = frog + size;
     if (Math.floor(next / (size * 10)) > Math.floor(frog / (size * 10))) {
       setFlash({ id: Date.now(), rank: rank + 1 });
@@ -176,21 +186,18 @@ export default function BuildPanel(props: Props) {
     touched();
   };
   const lastRank = hops.length ? hops[hops.length - 1].rank : 0;
-  const hopCount = (rank: number) => hops.filter((h) => h.rank === rank).length;
 
-  // ---------- roues ----------
+  // ---------- compteur ----------
   const turn = (rank: number, dir: 1 | -1) => {
-    const next = gv + dir * 10 ** rank;
+    const next = cv + dir * 10 ** rank;
     if (next < 0 || next > 999) return;
-    // Retenue ou emprunt quand le chiffre de cette roue passe de 9 à 0 (ou de 0 à 9).
-    const digit = Math.floor(gv / 10 ** rank) % 10;
-    if ((dir === 1 && digit === 9) || (dir === -1 && digit === 0)) {
-      if (rank + 1 < n) {
-        setFlash({ id: Date.now(), rank: rank + 1 });
-        play('click');
-      }
+    const digit = Math.floor(cv / 10 ** rank) % 10;
+    // Retenue (9 → 0) ou emprunt (0 → 9) : le chiffre de gauche bouge aussi.
+    if (((dir === 1 && digit === 9) || (dir === -1 && digit === 0)) && rank + 1 < n) {
+      setFlash({ id: Date.now(), rank: rank + 1 });
+      play('click');
     } else play('pop');
-    setGv(next);
+    setCv(next);
     touched();
   };
 
@@ -198,84 +205,91 @@ export default function BuildPanel(props: Props) {
   const check = () => {
     if (solved || anim) return;
     let ok = false;
+    let short = '';
     let text = '';
-    if (model === 'ruler' || model === 'gears') {
-      const v = model === 'ruler' ? frog : gv;
-      const where = model === 'ruler' ? 'La grenouille est sur' : 'Le compteur affiche';
+    if (model === 'ruler' || model === 'counter') {
+      const v = model === 'ruler' ? frog : cv;
       if (v === target) {
         ok = true;
+        short = 'Bravo !';
         text = `Bravo ! ${target}, c'est ${decompose(target, n)}.`;
-      } else if (!reveal) text = `${where} ${v}. Vérifie ce que tu as ajouté.`;
-      else if (v < target) text = `${where} ${v}. On veut ${target} : continue !`;
-      else text = `${where} ${v} : c'est trop. On veut ${target}.`;
+      } else if (!reveal) {
+        short = `Ça fait ${v}`;
+        text = `Ça fait ${v}. Vérifie ce que tu as ajouté.`;
+      } else if (v < target) {
+        short = 'Encore !';
+        text = `Ça fait ${v}. On veut ${target} : continue !`;
+      } else {
+        short = 'Trop loin !';
+        text = `Ça fait ${v} : c'est trop. On veut ${target}.`;
+      }
     } else {
       const verdict = judgeCounts(counts, target, names, reveal);
       ok = verdict.ok;
+      short = verdict.short;
       text = verdict.text;
       setHintCol(verdict.untidy ?? -1);
     }
     if (ok) {
-      setFb({ text, tone: 'good' });
+      setFb({ text: short, tone: 'good' });
       props.onSolved();
       say(text);
     } else {
-      soft(text);
+      soft(short, text);
       play('soft');
     }
   };
 
   const [sceneRef, width] = useWidth<HTMLDivElement>();
+  const prompt = props.prompt(model);
 
   return (
     <div className="build-panel">
-      <div className="chips" role="group" aria-label="Modèle">
+      <div className="vis-tabs five" role="tablist" aria-label="Modèle">
         {MODELS.map((m) => (
-          <button key={m.id} className="chip" aria-pressed={model === m.id} onClick={() => props.onModel(m.id)}>
-            <span className="chip-dot" />
-            {m.name}
+          <button
+            key={m.id}
+            role="tab"
+            className="vis-tab"
+            aria-selected={model === m.id}
+            onClick={() => props.onModel(m.id)}
+            aria-label={m.name}
+            title={m.name}
+          >
+            <VisualIcon id={m.id} />
           </button>
         ))}
       </div>
-      <p className="build-prompt">{props.prompt(model)}</p>
+      <p className="build-prompt">{prompt.text}</p>
 
       <section className="panel">
         {model === 'ruler' ? (
-          <div ref={sceneRef} className="vis ruler">
-            {width > 0 && (
-              <RulerScene
-                width={width}
-                v={frog}
-                hops={hops}
-                start={startValue}
-                zoomUnit={10 ** lastRank}
-                dur={dur}
-                flash={flash}
-              />
-            )}
-          </div>
-        ) : model === 'gears' ? (
-          <div ref={sceneRef} className="vis gears">
-            {width > 0 && (
-              <GearsScene
-                width={width}
-                v={gv}
-                n={n}
-                dur={dur}
-                active={-1}
-                clic={flash}
-                controls={(r) => (
-                  <div className="pm">
-                    <button className="pm-btn" onClick={() => turn(r, -1)} disabled={locked} aria-label="Reculer d'un cran">
-                      ▼
-                    </button>
-                    <button className="pm-btn" onClick={() => turn(r, 1)} disabled={locked} aria-label="Avancer d'un cran">
-                      ▲
-                    </button>
-                  </div>
-                )}
-              />
-            )}
-          </div>
+          <>
+            <div ref={sceneRef} className="vis ruler">
+              {width > 0 && (
+                <RulerScene width={width} v={frog} hops={hops} start={startValue} zoomUnit={10 ** lastRank} dur={dur} flash={flash} />
+              )}
+            </div>
+            <div className="hop-tools">
+              {Array.from({ length: n }, (_, r) => (
+                <button key={r} className={`btn hop-btn r${r}`} onClick={() => hop(r)} disabled={locked} aria-label={`Bond de ${10 ** r}`}>
+                  +{10 ** r}
+                </button>
+              ))}
+              <button className="btn" onClick={undoHop} disabled={locked || !hops.length} aria-label="Annuler le dernier bond">
+                <Replay />
+              </button>
+            </div>
+          </>
+        ) : model === 'counter' ? (
+          <CounterScene
+            n={n}
+            v={cv}
+            target={-1}
+            clic={flash}
+            onTap={locked ? undefined : (r) => turn(r, 1)}
+            onMinus={locked ? undefined : (r) => turn(r, -1)}
+          />
         ) : (
           <CountsBoard
             kind={model}
@@ -290,26 +304,8 @@ export default function BuildPanel(props: Props) {
             onRemove={onRemove}
             onGroup={onGroup}
             onBreak={onBreak}
-            onRefuse={soft}
+            onRefuse={(text) => soft('Pas ici', text)}
           />
-        )}
-        {model === 'ruler' && (
-          <>
-            <div className="hop-tools">
-              {Array.from({ length: n }, (_, r) => (
-                <button key={r} className={`btn hop-btn r${r}`} onClick={() => hop(r)} disabled={locked}>
-                  +{10 ** r}
-                  <small>{['petit bond', 'grand bond', 'très grand bond'][r]}</small>
-                </button>
-              ))}
-              <button className="btn" onClick={undoHop} disabled={locked || !hops.length}>
-                Annuler
-              </button>
-            </div>
-            <p className="hop-count">
-              {Array.from({ length: n }, (_, r) => `${['Petits bonds', 'Grands bonds', 'Très grands bonds'][r]} : ${hopCount(r)}`).join(' · ')}
-            </p>
-          </>
         )}
       </section>
 
@@ -317,9 +313,14 @@ export default function BuildPanel(props: Props) {
         {fb.text}
       </p>
       {!solved && (
-        <button className="btn primary" onClick={check} disabled={anim !== null}>
-          J'ai fini !
-        </button>
+        <div className="row-2">
+          <button className="btn" onClick={reset} aria-label="Recommencer">
+            <Replay />
+          </button>
+          <button className="btn primary" onClick={check} disabled={anim !== null}>
+            J'ai fini !
+          </button>
+        </div>
       )}
     </div>
   );

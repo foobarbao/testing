@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSay } from '../lib/speech';
 import { digitsOf } from '../engine/steps';
 import type { Lesson } from '../engine/types';
 import { Ghost, inside, useDrag } from '../lib/drag';
@@ -28,6 +29,11 @@ export default function PoseeAnswer({ lesson, solved, onAnswer, onIncomplete }: 
   const [carry, setCarry] = useState<(number | null)[]>(() => Array(n).fill(null));
   const [sel, setSel] = useState<Slot>({ kind: 'res', c: 0 });
   const slotRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const say = useSay();
+  useEffect(() => {
+    say("Commence par les unités. La petite case orange, c'est pour la retenue.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const x = (c: number) => OP + (n - 1 - c) * CELL;
   const keyOf = (s: Slot) => `${s.kind}${s.c}`;
 
@@ -107,7 +113,6 @@ export default function PoseeAnswer({ lesson, solved, onAnswer, onIncomplete }: 
         {Array.from({ length: n - 1 }, (_, i) => slotBtn({ kind: 'carry', c: i + 1 }, 2, carry[i + 1]))}
         {res.map((v, c) => slotBtn({ kind: 'res', c }, 140, v))}
       </div>
-      <p className="pose-tip">Commence par les unités. La petite case du haut, c'est pour la retenue.</p>
       <div className="tiles">
         {Array.from({ length: 10 }, (_, d) => (
           <button key={d} className="tile" onPointerDown={(e) => !solved && start(d, e)} disabled={solved}>

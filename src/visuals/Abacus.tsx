@@ -1,5 +1,6 @@
 import { useWidth } from '../lib/hooks';
-import { Columns, Pieces } from './Board';
+import { Columns, Pieces, columnRects } from './Board';
+import { GestureLayer } from './Gesture';
 import { HEAD, colLeft, type VisualProps } from './common';
 import type { Placed } from './pieces';
 import type { Lesson } from '../engine/types';
@@ -68,7 +69,7 @@ function layoutBeads(lesson: Lesson, stepIdx: number, width: number) {
 }
 
 /** Boulier : 10 perles sur une tige s'échangent contre 1 perle sur la tige de gauche. */
-export default function Abacus({ lesson, step }: VisualProps) {
+export default function Abacus({ lesson, step, gesture }: VisualProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const layout = width ? layoutBeads(lesson, step, width) : null;
   return (
@@ -83,6 +84,7 @@ export default function Abacus({ lesson, step }: VisualProps) {
             <div key={`t${i}`} className="ten-mark" style={{ left: t.x, top: t.y, width: t.w }} />
           ))}
           <Pieces items={layout.items} />
+          {gesture && <GestureLayer rects={columnRects(lesson.n, width)} height={layout.height} gesture={gesture} />}
         </Columns>
       )}
     </div>

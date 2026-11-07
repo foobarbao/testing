@@ -100,14 +100,13 @@ export function VisualIcon({ id }: { id: VisualId }) {
           <circle cx="44" cy="24" r="6" fill="var(--units)" />
         </svg>
       );
-    case 'gears':
+    case 'counter':
       return (
         <svg viewBox="0 0 64 48" className="vicon" aria-hidden="true">
-          <circle cx="20" cy="24" r="14" fill="none" stroke="var(--tens)" strokeWidth="5" strokeDasharray="4 3" />
-          <circle cx="20" cy="24" r="8" fill="var(--tens)" />
-          <circle cx="45" cy="24" r="12" fill="none" stroke="var(--units)" strokeWidth="5" strokeDasharray="4 3" />
-          <circle cx="45" cy="24" r="6" fill="var(--units)" />
-          <rect x="31" y="20" width="5" height="8" rx="2" fill="var(--carry)" />
+          <rect x="6" y="8" width="24" height="32" rx="6" fill="var(--ink)" />
+          <rect x="34" y="8" width="24" height="32" rx="6" fill="var(--ink)" />
+          <text x="18" y="32" textAnchor="middle" className="vicon-t" fontSize="20" fill="#9CC5FA">4</text>
+          <text x="46" y="32" textAnchor="middle" className="vicon-t" fontSize="20" fill="#7BE3A7">7</text>
         </svg>
       );
     case 'abacus':

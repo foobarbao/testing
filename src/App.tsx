@@ -65,8 +65,8 @@ export default function App() {
         {screen.name === 'picker' && (
           <Picker
             level={screen.level}
-            selected={prefs.visuals}
-            onChange={(visuals) => update({ visuals })}
+            selected={prefs.visual}
+            onChange={(visual) => update({ visual })}
             onBack={() => setScreen({ name: 'levels' })}
             onStart={() => setScreen({ name: 'exercise', level: screen.level })}
           />

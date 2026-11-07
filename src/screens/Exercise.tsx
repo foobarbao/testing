@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Back, Frog, Gauge, Note, Replay, Speaker, Star } from '../components/Icons';
+import { Back, Frog, Gauge, Note, Replay, Speaker, Star, VisualIcon } from '../components/Icons';
 import Keypad from '../components/Keypad';
 import { forgotCarry, wroteWholeSum } from '../engine/choices';
 import { LEVELS, STARS_PER_LEVEL, makeExercise } from '../engine/levels';
 import { RANK_TONE, buildLesson, digitsOf } from '../engine/steps';
-import type { Exercise as Ex } from '../engine/types';
+import type { Exercise as Ex, Step } from '../engine/types';
 import { useSound } from '../lib/sound';
 import { canSpeak, speak, stopSpeaking, useSay } from '../lib/speech';
 import type { AnswerMode, BuildModel, Prefs, VisualId } from '../lib/storage';
-import BuildPanel from '../play/BuildPanel';
+import BuildPanel, { type Prompt } from '../play/BuildPanel';
 import ChoiceAnswer from '../play/ChoiceAnswer';
 import PoseeAnswer from '../play/PoseeAnswer';
 import { countsFor } from '../play/model';
-import { VISUALS, visualById } from '../visuals';
-import { toggleVisual } from './Picker';
+import { VISUALS, needsGesture, visualById } from '../visuals';
+import type { Gesture } from '../visuals/common';
 
 interface Props {
   /** 1 à 4, ou 0 pour un calcul tapé par l'enfant. */
@@ -31,7 +31,8 @@ type Mode = 'answer' | 'guided';
 type Feedback = { text: string; tone: '' | 'good' | 'soft' };
 
 const SPEEDS = [0.5, 1, 1.5];
-const RANK_WORDS = ['unités', 'dizaines', 'centaines'];
+const PLURAL = ['unités', 'dizaines', 'centaines'];
+const HINT_AFTER_MS = 7000;
 
 export const ANSWER_MODES: { id: AnswerMode; label: string }[] = [
   { id: 'keypad', label: 'Clavier' },
@@ -39,13 +40,6 @@ export const ANSWER_MODES: { id: AnswerMode; label: string }[] = [
   { id: 'manip', label: 'Je manipule' },
   { id: 'choice', label: 'Je choisis' },
 ];
-
-const ASK: Record<AnswerMode, string> = {
-  keypad: "Tape ta réponse, ou demande de l'aide.",
-  posee: 'Écris le résultat dans les cases.',
-  manip: '',
-  choice: 'Quelle est la bonne réponse ?',
-};
 
 /** Lien direct vers un calcul : ?niveau=3&calcul=47+28 */
 function calcFromUrl(level: number): Ex | null {
@@ -73,13 +67,67 @@ function Num({ value }: { value: number }) {
   );
 }
 
-const manipPrompt = (a: number, b: number) => (m: BuildModel) =>
+const THING: Record<string, { group: string; carry: string; groupVoice: string; carryVoice: (to: string) => string }> = {
+  sticks: {
+    group: 'Fais un fagot !',
+    carry: 'Glisse le fagot',
+    groupVoice: 'Tape sur les bâtonnets pour faire un fagot de 10.',
+    carryVoice: (to) => `Fais glisser le fagot chez les ${to}.`,
+  },
+  money: {
+    group: 'À la banque !',
+    carry: 'Glisse les pièces',
+    groupVoice: 'Tape sur les pièces : 10 pièces vont à la banque.',
+    carryVoice: (to) => `Fais glisser les pièces chez les ${to} pour les échanger.`,
+  },
+  abacus: {
+    group: 'Prends 10 perles',
+    carry: 'Glisse les perles',
+    groupVoice: 'Tape sur les perles pour en prendre 10.',
+    carryVoice: (to) => `Fais glisser les perles vers les ${to}.`,
+  },
+  posee: {
+    group: 'Paquet de 10 !',
+    carry: 'Glisse la retenue',
+    groupVoice: 'Tape sur la colonne pour faire un paquet de 10.',
+    carryVoice: (to) => `Fais glisser la retenue en haut des ${to}.`,
+  },
+};
+
+/** Ce que l'enfant doit faire pour atteindre `next` : quelques mots à l'écran, une phrase pour la voix. */
+function instruction(visual: VisualId, next: Step): Prompt {
+  const c = next.col;
+  const cs = next.cols[c];
+  if (visual === 'ruler' || visual === 'counter') {
+    const b = cs?.b ?? 0;
+    if (visual === 'ruler') {
+      const kind = (b > 1 ? ['petits bonds', 'grands bonds', 'très grands bonds'] : ['petit bond', 'grand bond', 'très grand bond'])[c];
+      return { text: `${b} ${kind}`, voice: `Tape ${b} fois sur la règle pour faire ${b} ${kind}.` };
+    }
+    return { text: `Tape ${b} fois`, voice: `Tape ${b} fois sur le chiffre des ${PLURAL[c]}.` };
+  }
+  const t = THING[visual];
+  switch (next.kind) {
+    case 'add':
+      return { text: `Tape les ${PLURAL[c]}`, voice: `Tape sur les ${PLURAL[c]}.` };
+    case 'group':
+      return { text: t.group, voice: t.groupVoice };
+    case 'carry':
+      return { text: `${t.carry} ←`, voice: t.carryVoice(PLURAL[c + 1]) };
+    case 'write':
+      return { text: 'Écris le chiffre', voice: `Tape pour écrire le chiffre des ${PLURAL[c]}.` };
+    default:
+      return { text: '', voice: '' };
+  }
+}
+
+const manipPrompt = (a: number, b: number) => (m: BuildModel): Prompt =>
   ({
-    sticks: `Ajoute ${b} : fais glisser des fagots et des bâtonnets depuis la réserve, puis range-les.`,
-    money: `Tu as ${a} €. Ajoute ${b} € avec la réserve, puis va à la banque si besoin.`,
-    abacus: `Ajoute ${b} avec des perles, puis échange 10 perles contre 1 si besoin.`,
-    ruler: `La grenouille est sur ${a}. Fais des bonds pour ajouter ${b}.`,
-    gears: `Le compteur affiche ${a}. Tourne les roues pour ajouter ${b}.`,
+    sticks: { text: `Ajoute ${b}`, voice: `Ajoute ${b} : fais glisser des fagots et des bâtonnets, puis range-les.` },
+    money: { text: `Ajoute ${b} €`, voice: `Tu as ${a} euros. Ajoute ${b} euros, puis va à la banque si besoin.` },
+    abacus: { text: `Ajoute ${b}`, voice: `Ajoute ${b} avec des perles, puis échange 10 perles contre 1 si besoin.` },
+    ruler: { text: `Ajoute ${b}`, voice: `La grenouille est sur ${a}. Fais des bonds pour ajouter ${b}.` },
+    counter: { text: `Ajoute ${b}`, voice: `Le compteur affiche ${a}. Tape sur les chiffres pour ajouter ${b}.` },
   })[m];
 
 export default function Exercise({ level, fixed, prefs, update, onBack, onAnotherCalc }: Props) {
@@ -90,11 +138,12 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState<Mode>('answer');
   const [answer, setAnswer] = useState('');
-  const [feedback, setFeedback] = useState<Feedback>({ text: ASK[prefs.answerMode], tone: '' });
+  const [feedback, setFeedback] = useState<Feedback>({ text: '', tone: '' });
   const [solved, setSolved] = useState(false);
   const [shake, setShake] = useState(0);
   const [burst, setBurst] = useState(0);
   const [round, setRound] = useState(0);
+  const [hint, setHint] = useState(false);
   const dur = 600 / prefs.speed;
   const custom = level === 0;
   const info = LEVELS.find((l) => l.id === level);
@@ -102,7 +151,11 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
   const s = lesson.steps[step];
   const last = lesson.steps.length - 1;
   const answerMode = prefs.answerMode;
+  const visual = prefs.visual;
   const calcText = `${ex.a} + ${ex.b}`;
+  const next: Step | undefined = lesson.steps[step + 1];
+  const guided = mode === 'guided';
+  const waiting = guided && next !== undefined && needsGesture(visual, next);
 
   // On lit le calcul à chaque nouvel exercice.
   useEffect(() => {
@@ -110,34 +163,48 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ex]);
 
-  // Sons et voix à chaque nouvelle étape du mode guidé.
-  const prevStep = useRef(step);
-  useEffect(() => {
-    if (prevStep.current === step) return;
-    const forward = step > prevStep.current;
-    prevStep.current = step;
-    if (mode !== 'guided') return;
-    if (forward) {
-      if (s.kind === 'carry') play('whoosh');
-      else if (s.kind === 'done') play('fanfare');
-      else play('pop');
-    }
-    say(s.say);
-  }, [step, mode, s, play, say]);
-
   useEffect(() => () => stopSpeaking(), []);
+
+  // Mode guidé : les étapes sans geste (fin, retenue déjà vue sur la règle…) s'enchaînent seules.
+  useEffect(() => {
+    if (!guided || !next || waiting) return;
+    const id = window.setTimeout(() => setStep((k) => Math.min(last, k + 1)), dur * (next.kind === 'done' ? 1.5 : 0.6));
+    return () => window.clearTimeout(id);
+  }, [guided, next, waiting, dur, last]);
+
+  // Mode guidé : à chaque étape, la voix dit ce qui s'est passé puis ce qu'il faut faire.
+  useEffect(() => {
+    if (!guided) return;
+    setHint(false);
+    const quick = (visual === 'ruler' || visual === 'counter') && ['group', 'carry', 'write'].includes(s.kind);
+    const todo = waiting && next ? instruction(visual, next).voice : '';
+    let done = '';
+    if (step === 0) done = `${calcText}.`;
+    else if (!quick) {
+      done =
+        (visual === 'ruler' || visual === 'counter') && s.kind === 'add'
+          ? `${lesson.steps[step - 1].value} + ${s.cols[s.col].b * s.unit} = ${s.value}.`
+          : s.say;
+    }
+    if (s.kind === 'done') play('fanfare');
+    const text = `${done} ${todo}`.trim();
+    if (text) say(text);
+    // Si l'enfant ne trouve pas, la main apparaît.
+    const id = window.setTimeout(() => setHint(true), HINT_AFTER_MS);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guided, step, visual]);
 
   const reset = () => {
     setStep(0);
-    prevStep.current = 0;
     setMode('answer');
     setAnswer('');
-    setFeedback({ text: ASK[answerMode], tone: '' });
+    setFeedback({ text: '', tone: '' });
     setSolved(false);
     setRound((r) => r + 1);
   };
 
-  const next = () => {
+  const nextExercise = () => {
     if (custom) return onAnotherCalc?.();
     setEx((prev) => makeExercise(level, prev));
     reset();
@@ -146,43 +213,60 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
   const startGuide = () => {
     setMode('guided');
     setStep(0);
-    prevStep.current = 0;
-    say(lesson.steps[0].say);
+    setFeedback({ text: '', tone: '' });
   };
 
-  const backToAnswer = (fromEnd: boolean) => {
+  const backToAnswer = () => {
     setMode('answer');
     if (!solved) {
-      const text = fromEnd ? 'À toi ! Donne le résultat.' : ASK[answerMode];
-      setFeedback({ text, tone: '' });
-      if (fromEnd) say(text);
+      setStep(0);
+      setFeedback({ text: '', tone: '' });
     }
   };
+
+  const gesture: Gesture | undefined =
+    waiting && next
+      ? {
+          next,
+          hint,
+          onDone: () => {
+            play(next.kind === 'carry' ? 'whoosh' : 'pop');
+            setStep((k) => (k === step ? k + 1 : k));
+          },
+          onWrong: () => {
+            play('soft');
+            setHint(true);
+            say(instruction(visual, next).voice);
+          },
+        }
+      : undefined;
 
   const succeed = () => {
     setSolved(true);
     setStep(last);
-    prevStep.current = last;
-    setFeedback({ text: `Bravo ! ${ex.a} + ${ex.b} = ${lesson.result}`, tone: 'good' });
+    setFeedback({ text: 'Bravo !', tone: 'good' });
     if (!custom) {
       update((p) => ({ stars: { ...p.stars, [level]: Math.min(STARS_PER_LEVEL, (p.stars[level] ?? 0) + 1) } }));
     }
     setBurst((b) => b + 1);
     play('fanfare');
-    say(`Bravo ! ${ex.a} + ${ex.b} = ${lesson.result}.`);
+    say(`Bravo ! ${calcText} = ${lesson.result}.`);
   };
 
   /** Indice adapté à l'erreur : retenue oubliée, somme écrite en entier… */
-  const hintFor = (value: number) => {
+  const hintFor = (value: number): Prompt => {
     const g = lesson.steps.findIndex((k) => k.kind === 'group');
     if (g > 0 && value === forgotCarry(ex.a, ex.b)) {
       const add = lesson.steps[g - 1];
-      return `Tu as oublié la retenue ? Chez les ${RANK_WORDS[add.col]} : ${add.note.map((x) => x.t).join('')}.`;
+      return {
+        text: 'La retenue ?',
+        voice: `Tu as oublié la retenue ? Chez les ${PLURAL[add.col]} : ${add.note.map((x) => x.t).join('')}.`,
+      };
     }
     if (g > 0 && value === wroteWholeSum(ex.a, ex.b)) {
-      return "Dans une colonne, on n'écrit qu'un seul chiffre. Le 1 part en retenue !";
+      return { text: 'Un chiffre par case', voice: "Dans une colonne, on n'écrit qu'un seul chiffre. Le 1 part en retenue !" };
     }
-    return 'Presque ! Regardons ensemble ce qui se passe.';
+    return { text: 'Presque !', voice: 'Presque ! Regardons ensemble ce qui se passe.' };
   };
 
   const onAnswer = (value: number): boolean => {
@@ -191,18 +275,18 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
       succeed();
       return true;
     }
-    const text = hintFor(value);
-    setFeedback({ text, tone: 'soft' });
+    const h = hintFor(value);
+    setFeedback({ text: h.text, tone: 'soft' });
     setShake((n) => n + 1);
     play('soft');
-    say(text);
+    say(h.voice);
     return false;
   };
 
   const type = (d: string) => {
     if (solved) return;
     setAnswer((a) => (a.length < 3 ? a + d : a));
-    if (feedback.tone === 'soft') setFeedback({ text: ASK.keypad, tone: '' });
+    if (feedback.tone === 'soft') setFeedback({ text: '', tone: '' });
   };
   const erase = () => !solved && setAnswer((a) => a.slice(0, -1));
 
@@ -230,18 +314,15 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
 
   const setAnswerMode = (m: AnswerMode) => {
     update({ answerMode: m });
-    if (!solved) setFeedback({ text: ASK[m], tone: '' });
+    if (!solved) setFeedback({ text: '', tone: '' });
   };
-
-  const setVisuals = (v: VisualId[]) => update({ visuals: v });
   const speedIdx = Math.max(0, SPEEDS.indexOf(prefs.speed));
 
-  // En mode « Je manipule », c'est l'enfant qui anime : on cache les visuels.
-  // En mode « Je pose », l'addition posée est déjà à remplir : on ne la montre pas deux fois.
-  const showPanels = mode === 'guided' || solved || answerMode !== 'manip';
-  const shown = prefs.visuals
-    .filter((v) => mode === 'guided' || solved || answerMode !== 'posee' || v !== 'posee')
-    .map(visualById);
+  // Un seul visuel à l'écran. En « Je manipule », c'est le plateau de manipulation qui le remplace ;
+  // en « Je pose », on ne montre pas l'addition posée deux fois.
+  const hideVisual = !guided && !solved && (answerMode === 'manip' || (answerMode === 'posee' && visual === 'posee'));
+  const { Comp } = visualById(visual);
+  const label = guided ? (next ? (waiting ? instruction(visual, next).text : '') : `${calcText} = ${lesson.result}`) : '';
 
   return (
     <main className="screen exercise">
@@ -251,7 +332,6 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
         </button>
         <div className="bar-level">
           <b>{custom ? 'Mon calcul' : info?.title}</b>
-          <span>{custom ? 'Recopié des devoirs' : info?.hint}</span>
         </div>
         {!custom && (
           <span className="stars small" aria-label={`${stars} étoiles sur ${STARS_PER_LEVEL}`}>
@@ -304,7 +384,7 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
             key={shake}
             className={`answer ${answer || solved ? 'filled' : ''} ${solved ? 'good' : ''} ${shake ? 'shake' : ''}`}
           >
-            {solved ? lesson.result : answerMode === 'keypad' && answer ? answer : '?'}
+            {solved ? lesson.result : answerMode === 'keypad' && answer && !guided ? answer : '?'}
           </span>
         </div>
         {canSpeak && (
@@ -314,38 +394,73 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
         )}
       </div>
 
-      {showPanels && (
+      {!hideVisual && (
         <>
-          <div className="chips" role="group" aria-label="Visuels affichés">
+          <div className="vis-tabs" role="tablist" aria-label="Visuel">
             {VISUALS.map((v) => (
               <button
                 key={v.id}
-                className="chip"
-                aria-pressed={prefs.visuals.includes(v.id)}
-                onClick={() => setVisuals(toggleVisual(prefs.visuals, v.id))}
+                role="tab"
+                aria-selected={visual === v.id}
+                className="vis-tab"
+                onClick={() => update({ visual: v.id })}
+                aria-label={v.name}
+                title={v.name}
               >
-                <span className="chip-dot" />
-                {v.name}
+                <VisualIcon id={v.id} />
               </button>
             ))}
           </div>
-          {shown.length > 0 && (
-            <div className={`panels ${shown.length === 2 ? 'two' : ''}`}>
-              {shown.map(({ id, name, Comp }) => (
-                <section key={id} className="panel">
-                  <h2 className="panel-title">
-                    <span>{name}</span>
-                    {shown.length === 2 && <span className="sync">même étape</span>}
-                  </h2>
-                  <Comp lesson={lesson} step={step} dur={dur} />
-                </section>
-              ))}
-            </div>
-          )}
+          <section className={`panel stage ${waiting ? 'your-turn' : ''}`}>
+            <Comp key={visual} lesson={lesson} step={step} dur={dur} gesture={gesture} />
+          </section>
         </>
       )}
 
-      {mode === 'answer' ? (
+      {guided ? (
+        <div className="guided-zone">
+          <div className="guide">
+            <Frog className="mascot" />
+            <p className="guide-short" aria-live="polite">
+              {label}
+            </p>
+            {canSpeak && (
+              <button
+                className="icon-btn"
+                onClick={() => speak(next && waiting ? instruction(visual, next).voice : s.say)}
+                aria-label="Réécouter"
+              >
+                <Speaker />
+              </button>
+            )}
+          </div>
+          {next ? (
+            <div className="row-3 guided">
+              <button className="btn" onClick={() => setHint(true)} disabled={!waiting}>
+                <svg viewBox="0 0 40 48" className="btn-hand" aria-hidden="true">
+                  <path d="M14 4a4 4 0 0 1 8 0v17l2-1a4 4 0 0 1 5 2l1-1a4 4 0 0 1 5 3v9c0 7-5 13-12 13h-3c-5 0-8-3-10-7L4 28a4 4 0 0 1 6-5l4 4z" />
+                </svg>
+                Aide
+              </button>
+              <button className="btn" onClick={() => setStep(0)} aria-label="Recommencer">
+                <Replay />
+              </button>
+              <button className="btn" onClick={backToAnswer}>
+                Je réponds
+              </button>
+            </div>
+          ) : (
+            <div className="row-2">
+              <button className="btn" onClick={() => setStep(0)} aria-label="Recommencer">
+                <Replay />
+              </button>
+              <button className="btn primary" onClick={solved ? nextExercise : backToAnswer}>
+                {solved ? (custom ? 'Un autre calcul' : 'Suivant') : 'À toi !'}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
         <div className="answer-zone">
           {!solved && (
             <div className="answer-tabs" role="tablist" aria-label="Comment répondre">
@@ -385,9 +500,8 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
               solved={solved}
               onAnswer={onAnswer}
               onIncomplete={() => {
-                const text = 'Remplis toutes les cases du résultat.';
-                setFeedback({ text, tone: 'soft' });
-                say(text);
+                setFeedback({ text: 'Remplis les cases', tone: 'soft' });
+                say('Remplis toutes les cases du résultat.');
               }}
             />
           )}
@@ -406,8 +520,8 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
               <button className="btn" onClick={startGuide}>
                 <Replay /> Revoir
               </button>
-              <button className="btn primary" onClick={next}>
-                {custom ? 'Un autre calcul' : 'Exercice suivant'}
+              <button className="btn primary" onClick={nextExercise}>
+                {custom ? 'Un autre calcul' : 'Suivant'}
               </button>
             </div>
           ) : answerMode === 'keypad' ? (
@@ -430,46 +544,6 @@ export default function Exercise({ level, fixed, prefs, update, onBack, onAnothe
               Montre-moi
             </button>
           )}
-        </div>
-      ) : (
-        <div className="guided-zone">
-          <div className="guide">
-            <Frog className="mascot" />
-            <p aria-live="polite">
-              {s.ask ? (
-                <>
-                  {s.say.replace(s.ask, '')}
-                  <span className="ask">{s.ask}</span>
-                </>
-              ) : (
-                s.say
-              )}
-            </p>
-            {canSpeak && (
-              <button className="icon-btn" onClick={() => speak(s.say)} aria-label="Lire à voix haute">
-                <Speaker />
-              </button>
-            )}
-          </div>
-          <div className="dots" aria-label={`Étape ${step + 1} sur ${last + 1}`}>
-            {lesson.steps.map((_, i) => (
-              <i key={i} className={i === step ? 'on' : i < step ? 'past' : ''} />
-            ))}
-          </div>
-          <div className="row-3 guided">
-            <button className="btn" onClick={() => setStep((k) => Math.max(0, k - 1))} disabled={step === 0}>
-              <Back /> Précédent
-            </button>
-            <button className="btn primary" onClick={() => (step === last ? backToAnswer(true) : setStep((k) => k + 1))}>
-              {step === last ? (solved ? 'Terminé' : 'À toi !') : s.kind === 'group' ? 'On regroupe !' : 'Suivant'}
-            </button>
-            <button className="btn" onClick={() => setStep(0)}>
-              <Replay /> Rejouer
-            </button>
-          </div>
-          <button className="btn slim" onClick={() => backToAnswer(false)}>
-            Je réponds
-          </button>
         </div>
       )}
 

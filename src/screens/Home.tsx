@@ -16,10 +16,7 @@ export default function Home({ prefs, onAddition, onMyCalc, onBuild }: Props) {
     <main className="screen home">
       <header className="home-head">
         <Frog className="home-frog" />
-        <div>
-          <h1>La retenue</h1>
-          <p>Que veux-tu faire ?</p>
-        </div>
+        <h1>La retenue</h1>
       </header>
 
       <div className="op-grid">
@@ -40,15 +37,15 @@ export default function Home({ prefs, onAddition, onMyCalc, onBuild }: Props) {
           </span>
         </button>
 
-        <button className="op-card small mine" onClick={onMyCalc}>
-          <span className="op-sign small" aria-hidden="true">
-            <svg viewBox="0 0 32 32" width="34" height="34">
+        <button className="op-card mine" onClick={onMyCalc}>
+          <span className="op-sign" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="44" height="44">
               <path d="M7 25l2-7L21 6l5 5-12 12z" fill="currentColor" />
               <path d="M6 27h20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </span>
           <span className="op-name">Mon calcul</span>
-          <span className="op-hint">Recopie un calcul des devoirs</span>
+          <span className="op-hint">Le calcul des devoirs</span>
         </button>
 
         <button className="op-card small build" onClick={onBuild}>
@@ -64,7 +61,7 @@ export default function Home({ prefs, onAddition, onMyCalc, onBuild }: Props) {
             </svg>
           </span>
           <span className="op-name">Construis le nombre</span>
-          <span className="op-hint">Avec des fagots, des pièces, des perles…</span>
+          <span className="op-hint">Fagots, pièces, perles</span>
         </button>
 
         <button className="op-card small sub" disabled aria-disabled="true">

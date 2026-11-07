@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { digitsOf } from '../engine/steps';
-import { useHops, useWidth } from '../lib/hooks';
+import { useWidth } from '../lib/hooks';
 import { useSound } from '../lib/sound';
 import { RANK_CLASS, type VisualProps } from './common';
+import { Hand } from './Gesture';
+import { useTaps } from './taps';
 
 const BASE = 92;
 /** Pixels par unité selon le pas en cours : on dézoome pour les dizaines et les centaines. */
@@ -105,20 +107,18 @@ export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, f
   );
 }
 
-/** Règle graduée : la grenouille avance par petits bonds, puis par bonds de 10 et de 100. */
-export default function Ruler({ lesson, step, dur }: VisualProps) {
+/** Règle graduée : l'enfant tape pour faire chaque bond de la grenouille (1, puis 10, puis 100). */
+export default function Ruler({ lesson, step, dur, gesture }: VisualProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const play = useSound();
   const s = lesson.steps[step];
   const [flash, setFlash] = useState<{ id: number; rank: number } | null>(null);
+  const { taps, need, tap } = useTaps(step, gesture, dur * 0.9);
+  const unit = gesture?.next.kind === 'add' ? gesture.next.unit : 0;
+  const v = s.value + taps * unit;
 
-  const v = useHops(s.value, s.unit, dur * 0.75, lesson.id, (rank) => {
-    setFlash({ id: Date.now(), rank });
-    play('click');
-  });
-
-  // Le zoom suit le dernier pas utilisé (la fin garde celui des centaines par exemple).
-  const zoomUnit = s.kind === 'done' ? lesson.steps[step - 1].unit : s.unit;
+  // Le zoom suit la taille des bonds en cours (la fin garde celui du dernier bond).
+  const zoomUnit = unit || (s.kind === 'done' ? lesson.steps[step - 1].unit : s.unit);
 
   const hops = useMemo(() => {
     const list: Hop[] = [];
@@ -132,19 +132,45 @@ export default function Ruler({ lesson, step, dur }: VisualProps) {
     return list;
   }, [lesson]);
 
+  const onTap = () => {
+    if (!gesture) return;
+    if (need === 0) return gesture.onWrong();
+    if (!tap()) return;
+    const next = v + unit;
+    if (Math.floor(next / (unit * 10)) > Math.floor(v / (unit * 10))) {
+      setFlash({ id: Date.now(), rank: Math.round(Math.log10(unit)) + 1 });
+      play('click');
+    } else play('pop');
+  };
+
+  const rank = gesture?.next.kind === 'add' ? gesture.next.col : 0;
   return (
-    <div ref={ref} className="vis ruler">
-      {width > 0 && (
-        <RulerScene
-          width={width}
-          v={v}
-          target={s.value}
-          hops={hops.filter((h) => h.to <= v)}
-          start={lesson.ex.a}
-          zoomUnit={zoomUnit}
-          dur={dur}
-          flash={flash}
-        />
+    <div className="ruler-wrap">
+      <div ref={ref} className={`vis ruler ${gesture && need ? 'tappable' : ''}`} onClick={onTap}>
+        {width > 0 && (
+          <RulerScene
+            width={width}
+            v={v}
+            hops={hops.filter((h) => h.to <= v)}
+            start={lesson.ex.a}
+            zoomUnit={zoomUnit}
+            dur={dur}
+            flash={flash}
+          />
+        )}
+        {gesture && need > 0 && (
+          <span className={`hop-size t-${RANK_CLASS[rank]}`} style={{ left: width / 2 + 26 }}>
+            +{unit}
+          </span>
+        )}
+        {gesture?.hint && need > 0 && <Hand x={width / 2 - 10} y={58} />}
+      </div>
+      {gesture && need > 0 && (
+        <span className={`tap-dots ${RANK_CLASS[rank]}`} aria-label={`Encore ${need - taps} bonds`}>
+          {Array.from({ length: need }, (_, k) => (
+            <i key={k} className={k < taps ? 'on' : ''} />
+          ))}
+        </span>
       )}
     </div>
   );

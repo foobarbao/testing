@@ -207,7 +207,6 @@ export default function CountsBoard(props: Props) {
               <span className={`pc r${r} supply-pc`} style={pieceSize(kind, r)}>
                 <PieceFace kind={kind} rank={r} />
               </span>
-              <span className="supply-name">{names.one[r]}</span>
             </button>
           ))}
         </div>
