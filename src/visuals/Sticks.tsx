@@ -3,7 +3,7 @@ import { Columns, Extras, Pieces } from './Board';
 import type { VisualProps } from './common';
 import { layoutPieces, type PiecesConfig } from './pieces';
 
-const CONFIG: PiecesConfig = {
+export const STICKS_CONFIG: PiecesConfig = {
   lineH: 42,
   dims: [
     { w: 6, h: 36, pitch: 10 },
@@ -21,7 +21,7 @@ const CONFIG: PiecesConfig = {
 /** Bâtonnets, fagots de 10 et gros paquets de 100. */
 export default function Sticks({ lesson, step }: VisualProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
-  const layout = width ? layoutPieces(lesson, step, width, CONFIG) : null;
+  const layout = width ? layoutPieces(lesson, step, width, STICKS_CONFIG) : null;
   return (
     <div ref={ref} className="vis sticks">
       {layout && (

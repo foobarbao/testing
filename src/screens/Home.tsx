@@ -5,9 +5,11 @@ import type { Prefs } from '../lib/storage';
 interface Props {
   prefs: Prefs;
   onAddition: () => void;
+  onMyCalc: () => void;
+  onBuild: () => void;
 }
 
-export default function Home({ prefs, onAddition }: Props) {
+export default function Home({ prefs, onAddition, onMyCalc, onBuild }: Props) {
   const total = LEVELS.reduce((acc, l) => acc + Math.min(STARS_PER_LEVEL, prefs.stars[l.id] ?? 0), 0);
   const max = LEVELS.length * STARS_PER_LEVEL;
   return (
@@ -16,7 +18,7 @@ export default function Home({ prefs, onAddition }: Props) {
         <Frog className="home-frog" />
         <div>
           <h1>La retenue</h1>
-          <p>Choisis une opération</p>
+          <p>Que veux-tu faire ?</p>
         </div>
       </header>
 
@@ -37,10 +39,38 @@ export default function Home({ prefs, onAddition }: Props) {
             ))}
           </span>
         </button>
-        <button className="op-card sub" disabled aria-disabled="true">
-          <span className="op-sign" aria-hidden="true">−</span>
+
+        <button className="op-card small mine" onClick={onMyCalc}>
+          <span className="op-sign small" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="34" height="34">
+              <path d="M7 25l2-7L21 6l5 5-12 12z" fill="currentColor" />
+              <path d="M6 27h20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </span>
+          <span className="op-name">Mon calcul</span>
+          <span className="op-hint">Recopie un calcul des devoirs</span>
+        </button>
+
+        <button className="op-card small build" onClick={onBuild}>
+          <span className="op-sign small" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="34" height="34">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                <rect key={i} x={4 + i * 1.3} y={6} width={1} height={20} fill="currentColor" />
+              ))}
+              <rect x="3" y="14" width="15" height="4" rx="2" fill="currentColor" />
+              {[0, 1, 2].map((i) => (
+                <rect key={i} x={21 + i * 3.6} y={6} width={2.2} height={20} rx={1.1} fill="currentColor" />
+              ))}
+            </svg>
+          </span>
+          <span className="op-name">Construis le nombre</span>
+          <span className="op-hint">Avec des fagots, des pièces, des perles…</span>
+        </button>
+
+        <button className="op-card small sub" disabled aria-disabled="true">
+          <span className="op-sign small" aria-hidden="true">−</span>
           <span className="op-name">Soustraction</span>
-          <span className="op-soon">Bientôt</span>
+          <span className="op-hint">Bientôt</span>
         </button>
       </div>
     </main>

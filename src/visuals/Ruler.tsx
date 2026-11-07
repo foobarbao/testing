@@ -12,63 +12,48 @@ const ZOOM: Record<number, { px: number; minor: number; label: number }> = {
   100: { px: 0.36, minor: 50, label: 100 },
 };
 
-interface Hop {
+export interface Hop {
   from: number;
   to: number;
   rank: number;
 }
 
-/** Règle graduée : un personnage avance par petits bonds, puis par bonds de 10 et de 100. */
-export default function Ruler({ lesson, step, dur }: VisualProps) {
-  const [ref, width] = useWidth<HTMLDivElement>();
-  const play = useSound();
-  const s = lesson.steps[step];
-  const [flash, setFlash] = useState<{ id: number; rank: number } | null>(null);
+interface SceneProps {
+  width: number;
+  /** Position de la grenouille. */
+  v: number;
+  /** Prochaine position (pour dessiner la règle assez loin pendant le bond). */
+  target?: number;
+  hops: Hop[];
+  start: number;
+  zoomUnit: number;
+  dur: number;
+  flash: { id: number; rank: number } | null;
+}
 
-  const v = useHops(s.value, s.unit, dur * 0.75, lesson.id, (rank) => {
-    setFlash({ id: Date.now(), rank });
-    play('click');
-  });
-
-  // Le zoom suit le dernier pas utilisé (la fin garde celui des centaines par exemple).
-  const zoomUnit = s.kind === 'done' ? lesson.steps[step - 1].unit : s.unit;
-  const z = ZOOM[zoomUnit];
-
-  const hops = useMemo(() => {
-    const list: Hop[] = [];
-    let p = lesson.ex.a;
-    digitsOf(lesson.ex.b).forEach((d, rank) => {
-      for (let k = 0; k < d; k++) {
-        list.push({ from: p, to: p + 10 ** rank, rank });
-        p += 10 ** rank;
-      }
-    });
-    return list;
-  }, [lesson]);
-
-  if (!width) return <div ref={ref} className="vis ruler" />;
-
+/** La règle, la grenouille et ses bonds. */
+export function RulerScene({ width, v, target = v, hops, start, zoomUnit, dur, flash }: SceneProps) {
+  const z = ZOOM[zoomUnit] ?? ZOOM[1];
   const half = width / 2 / z.px + z.minor * 2;
-  const lo = Math.max(0, Math.floor((Math.min(v, s.value) - half) / z.minor) * z.minor);
-  const hi = Math.max(v, s.value) + half;
+  const lo = Math.max(0, Math.floor((Math.min(v, target) - half) / z.minor) * z.minor);
+  const hi = Math.max(v, target) + half;
   const ticks: number[] = [];
   for (let t = lo; t <= hi; t += z.minor) ticks.push(t);
   const shift = width / 2 - v * z.px;
   const kind = (t: number) => (t % 100 === 0 ? 'c' : t % 10 === 0 ? 'd' : t % 5 === 0 ? 'five' : 'u');
 
   return (
-    <div ref={ref} className="vis ruler">
-      <svg width={width} height={128} role="img" aria-label={`Règle graduée, le personnage est sur ${v}`}>
+    <>
+      <svg width={width} height={128} role="img" aria-label={`Règle graduée, la grenouille est sur ${v}`}>
         <g className="ruler-track" style={{ transform: `translateX(${shift}px)`, transitionDuration: `${dur * 0.7}ms` }}>
           <line x1={lo * z.px} x2={hi * z.px} y1={BASE} y2={BASE} className="ruler-base" />
           {ticks.map((t) => {
             const k = kind(t);
             const h = k === 'c' ? 30 : k === 'd' ? 24 : k === 'five' ? 14 : 9;
-            const showLabel = t % z.label === 0;
             return (
               <g key={t}>
                 <line x1={t * z.px} x2={t * z.px} y1={BASE} y2={BASE - h} className={`tick ${k}`} />
-                {showLabel && (
+                {t % z.label === 0 && (
                   <text x={t * z.px} y={BASE + 18} className={`tick-label ${k}`} textAnchor="middle">
                     {t}
                   </text>
@@ -77,20 +62,20 @@ export default function Ruler({ lesson, step, dur }: VisualProps) {
             );
           })}
           <g className="start-flag">
-            <line x1={lesson.ex.a * z.px} x2={lesson.ex.a * z.px} y1={BASE} y2={BASE + 28} />
-            <text x={lesson.ex.a * z.px + 4} y={BASE + 34}>
+            <line x1={start * z.px} x2={start * z.px} y1={BASE} y2={BASE + 28} />
+            <text x={start * z.px + 4} y={BASE + 34}>
               départ
             </text>
           </g>
           {hops
-            .filter((h) => h.to <= v && (h.to - h.from) * z.px >= 6)
-            .map((h) => {
+            .filter((h) => Math.max(h.from, h.to) <= Math.max(v, start) && Math.abs(h.to - h.from) * z.px >= 6)
+            .map((h, i) => {
               const x1 = h.from * z.px;
               const x2 = h.to * z.px;
-              const lift = Math.min(46, (x2 - x1) * 0.6);
+              const lift = Math.min(46, Math.abs(x2 - x1) * 0.6);
               return (
                 <path
-                  key={`${h.from}-${h.rank}`}
+                  key={`${i}-${h.from}-${h.rank}`}
                   d={`M${x1},${BASE - 4} Q${(x1 + x2) / 2},${BASE - 4 - lift * 1.6} ${x2},${BASE - 4}`}
                   className={`hop ${RANK_CLASS[h.rank]}`}
                 />
@@ -115,6 +100,51 @@ export default function Ruler({ lesson, step, dur }: VisualProps) {
         <span key={flash.id} className={`ruler-flash ${RANK_CLASS[flash.rank]}`} style={{ left: width / 2 }}>
           +1 {flash.rank === 1 ? 'dizaine' : 'centaine'} !
         </span>
+      )}
+    </>
+  );
+}
+
+/** Règle graduée : la grenouille avance par petits bonds, puis par bonds de 10 et de 100. */
+export default function Ruler({ lesson, step, dur }: VisualProps) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const play = useSound();
+  const s = lesson.steps[step];
+  const [flash, setFlash] = useState<{ id: number; rank: number } | null>(null);
+
+  const v = useHops(s.value, s.unit, dur * 0.75, lesson.id, (rank) => {
+    setFlash({ id: Date.now(), rank });
+    play('click');
+  });
+
+  // Le zoom suit le dernier pas utilisé (la fin garde celui des centaines par exemple).
+  const zoomUnit = s.kind === 'done' ? lesson.steps[step - 1].unit : s.unit;
+
+  const hops = useMemo(() => {
+    const list: Hop[] = [];
+    let p = lesson.ex.a;
+    digitsOf(lesson.ex.b).forEach((d, rank) => {
+      for (let k = 0; k < d; k++) {
+        list.push({ from: p, to: p + 10 ** rank, rank });
+        p += 10 ** rank;
+      }
+    });
+    return list;
+  }, [lesson]);
+
+  return (
+    <div ref={ref} className="vis ruler">
+      {width > 0 && (
+        <RulerScene
+          width={width}
+          v={v}
+          target={s.value}
+          hops={hops.filter((h) => h.to <= v)}
+          start={lesson.ex.a}
+          zoomUnit={zoomUnit}
+          dur={dur}
+          flash={flash}
+        />
       )}
     </div>
   );

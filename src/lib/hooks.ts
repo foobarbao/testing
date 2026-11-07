@@ -1,18 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-/** Largeur d'un élément, mise à jour quand il change de taille. */
+/** Largeur d'un élément, mise à jour quand il change de taille ou est remplacé. */
 export function useWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
+  const [el, setEl] = useState<T | null>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
     setWidth(el.clientWidth);
     const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-  return [ref, width] as const;
+  }, [el]);
+  return [setEl, width] as const;
 }
 
 /**

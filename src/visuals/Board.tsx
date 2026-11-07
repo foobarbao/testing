@@ -3,6 +3,42 @@ import type { Lesson } from '../engine/types';
 import { RANK_CLASS, RANK_LABEL, activeCol, colCount, colLeft } from './common';
 import type { Extra, Placed } from './pieces';
 
+interface FrameProps {
+  n: number;
+  width: number;
+  height: number;
+  /** Colonne en surbrillance, ou -1. */
+  active: number;
+  /** Nombre affiché dans la pastille de chaque colonne (null = pas de pastille). */
+  counts?: (number | null)[];
+  /** Colonne à faire clignoter (indice pour l'enfant). */
+  hint?: number;
+  children?: ReactNode;
+}
+
+/** Fond commun des visuels en colonnes : titres, surbrillance, pastilles. */
+export function ColumnsFrame({ n, width, height, active, counts, hint = -1, children }: FrameProps) {
+  const colW = width / n;
+  return (
+    <div className="board" style={{ height }}>
+      {Array.from({ length: n }, (_, c) => {
+        const count = counts?.[c] ?? null;
+        return (
+          <div
+            key={c}
+            className={`board-col ${RANK_CLASS[c]} ${active === c ? 'hl' : ''} ${hint === c ? 'hint' : ''}`}
+            style={{ left: colLeft(c, n, width) + 2, width: colW - 4 }}
+          >
+            <span className="board-head">{RANK_LABEL[c]}</span>
+            {counts && <span className={`board-count ${count !== null ? 'on' : ''}`}>{count ?? ''}</span>}
+          </div>
+        );
+      })}
+      {children}
+    </div>
+  );
+}
+
 interface ColumnsProps {
   lesson: Lesson;
   step: number;
@@ -13,28 +49,19 @@ interface ColumnsProps {
   counts?: boolean;
 }
 
-/** Fond commun des visuels en colonnes : titres, surbrillance, pastilles. */
+/** Fond d'un visuel qui suit une leçon pas à pas. */
 export function Columns({ lesson, step, width, height, children, counts = true }: ColumnsProps) {
   const s = lesson.steps[step];
-  const act = activeCol(s);
-  const colW = width / lesson.n;
   return (
-    <div className="board" style={{ height }}>
-      {s.cols.map((cs, c) => {
-        const count = colCount(s, c);
-        return (
-          <div
-            key={c}
-            className={`board-col ${RANK_CLASS[c]} ${act === c ? 'hl' : ''}`}
-            style={{ left: colLeft(c, lesson.n, width) + 2, width: colW - 4 }}
-          >
-            <span className="board-head">{RANK_LABEL[cs.rank]}</span>
-            {counts && <span className={`board-count ${count !== null ? 'on' : ''}`}>{count ?? ''}</span>}
-          </div>
-        );
-      })}
+    <ColumnsFrame
+      n={lesson.n}
+      width={width}
+      height={height}
+      active={activeCol(s)}
+      counts={counts ? s.cols.map((_, c) => colCount(s, c)) : undefined}
+    >
       {children}
-    </div>
+    </ColumnsFrame>
   );
 }
 
